@@ -1,0 +1,3179 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SQL语句管理工具</title>
+  <!-- Tailwind CSS v3 -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome -->
+  <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+  <!-- CodeMirror for SQL syntax highlighting -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/ajax/libs/codemirror/5.65.2/theme/dracula.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/sql/sql.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ajax/libs/codemirror/5.65.2/addon/edit/matchbrackets.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/edit/closebrackets.min.js"></script>
+  <!-- Tabulator for result table -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/tabulator-tables/5.5.1/css/tabulator.min.css" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tabulator-tables/5.5.1/js/tabulator.min.js"></script>
+  <script>
+    // 检查Tabulator是否加载成功
+    window.addEventListener('load', function() {
+      if (typeof Tabulator === 'undefined') {
+        console.error('Tabulator加载失败');
+        // 尝试使用备用CDN
+        var script = document.createElement('script');
+        script.src = 'https://unpkg.com/tabulator-tables@5.5.1/dist/js/tabulator.min.js';
+        script.onload = function() {
+          console.log('Tabulator通过备用CDN加载成功');
+        };
+        script.onerror = function() {
+          console.error('Tabulator备用CDN加载也失败');
+        };
+        document.head.appendChild(script);
+      } else {
+        console.log('Tabulator加载成功');
+      }
+    });
+  </script>
+  <!-- Tailwind Config -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#3B82F6',
+            secondary: '#10B981',
+            dark: '#1E293B',
+            light: '#F8FAFC',
+            accent: '#8B5CF6',
+            danger: '#EF4444',
+            warning: '#F59E0B',
+            info: '#3B82F6',
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['Fira Code', 'monospace'],
+          },
+          boxShadow: {
+            'inner-lg': 'inset 0 2px 4px 0 rgba(0, 0, 0, 0.06)',
+          }
+        }
+      }
+    }
+  </script>
+  <style type="text/tailwindcss">
+    @layer utilities {
+      .content-auto {
+        content-visibility: auto;
+      }
+      .glass-effect {
+        @apply bg-opacity-20 backdrop-blur-lg backdrop-filter;
+      }
+      .transition-all-200 {
+        @apply transition-all duration-200 ease-in-out;
+      }
+      .scrollbar-thin {
+        scrollbar-width: thin;
+      }
+      .scrollbar-thin::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      .scrollbar-thin::-webkit-scrollbar-track {
+        @apply bg-dark;
+      }
+      .scrollbar-thin::-webkit-scrollbar-thumb {
+        @apply bg-gray-600 rounded-full;
+      }
+      .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+        @apply bg-gray-500;
+      }
+    }
+  </style>
+  <style>
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background-color: #0F172A;
+      color: #F8FAFC;
+    }
+    
+    .CodeMirror {
+      height: 100%;
+      font-family: 'Fira Code', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      border-radius: 0.5rem;
+    }
+    
+    .cm-s-dracula .CodeMirror-gutters {
+      background-color: #282a36;
+      border-right: 1px solid #44475a;
+    }
+    
+    .tabulator {
+      background-color: #1E293B;
+      color: #F8FAFC;
+      border-radius: 0.5rem;
+    }
+    
+    .tabulator-header {
+      background-color: #334155;
+      border-bottom: 1px solid #475569;
+    }
+    
+    .tabulator-header .tabulator-col {
+      background-color: #334155;
+      color: #F8FAFC;
+      border-right: 1px solid #475569;
+    }
+    
+    .tabulator-row {
+      border-bottom: 1px solid #334155;
+    }
+    
+    .tabulator-row:nth-child(even) {
+      background-color: #1E293B;
+    }
+    
+    .tabulator-row:nth-child(odd) {
+      background-color: #0F172A;
+    }
+    
+    .tabulator-row:hover {
+      background-color: #334155;
+    }
+    
+    .tabulator-cell {
+      border-right: 1px solid #334155;
+    }
+    
+    .tabulator-paginator {
+      background-color: #1E293B;
+      border-top: 1px solid #334155;
+    }
+    
+    .tabulator-paginator button {
+      background-color: #334155;
+      color: #F8FAFC;
+      border: 1px solid #475569;
+    }
+    
+    .tabulator-paginator button:hover {
+      background-color: #475569;
+    }
+    
+    .tabulator-paginator button.active {
+      background-color: #3B82F6;
+      border-color: #3B82F6;
+    }
+    
+    .sql-result-container {
+      min-height: 300px;
+    }
+    
+    .notification {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 1rem;
+      border-radius: 0.5rem;
+      background-color: #1E293B;
+      color: #F8FAFC;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+      z-index: 50;
+      transform: translateX(120%);
+      transition: transform 0.3s ease-in-out;
+    }
+    
+    .notification.show {
+      transform: translateX(0);
+    }
+    
+    .notification.success {
+      border-left: 4px solid #10B981;
+    }
+    
+    .notification.error {
+      border-left: 4px solid #EF4444;
+    }
+    
+    .notification.info {
+      border-left: 4px solid #3B82F6;
+    }
+    
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 100;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s ease, visibility 0.3s ease;
+    }
+    
+    .modal.show {
+      opacity: 1;
+      visibility: visible;
+    }
+    
+    .modal-content {
+      background-color: #1E293B;
+      border-radius: 0.5rem;
+      width: 90%;
+      max-width: 600px;
+      max-height: 90vh;
+      overflow-y: auto;
+      transform: translateY(-20px);
+      transition: transform 0.3s ease;
+    }
+    
+    .modal.show .modal-content {
+      transform: translateY(0);
+    }
+    
+    .tooltip {
+      position: relative;
+      display: inline-block;
+    }
+    
+    .tooltip .tooltip-text {
+      visibility: hidden;
+      width: 120px;
+      background-color: #334155;
+      color: #fff;
+      text-align: center;
+      border-radius: 6px;
+      padding: 5px;
+      position: absolute;
+      z-index: 1;
+      bottom: 125%;
+      left: 50%;
+      margin-left: -60px;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    
+    .tooltip:hover .tooltip-text {
+      visibility: visible;
+      opacity: 1;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+  <!-- Header -->
+  <header class="bg-dark border-b border-gray-700 shadow-md">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-2">
+        <i class="fa fa-database text-primary text-2xl"></i>
+        <h1 class="text-xl font-bold text-light">SQL语句管理工具</h1>
+      </div>
+      <div class="flex items-center space-x-4">
+        <button id="new-sql-btn" class="bg-primary hover:bg-blue-600 text-white px-4 py-2 rounded-md flex items-center transition-all-200">
+          <i class="fa fa-plus mr-2"></i>新建SQL
+        </button>
+        <div class="relative">
+          <button id="db-connection-btn" class="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-md flex items-center transition-all-200">
+            <i class="fa fa-plug mr-2"></i>
+            <span id="current-db">未连接</span>
+            <i class="fa fa-chevron-down ml-2"></i>
+          </button>
+          <div id="db-connection-dropdown" class="absolute right-0 mt-2 w-64 bg-dark border border-gray-700 rounded-md shadow-lg hidden z-10">
+            <div class="p-4">
+              <h3 class="text-lg font-medium mb-3">数据库连接</h3>
+              <div class="space-y-3">
+                <div>
+                  <label class="block text-sm font-medium text-gray-300 mb-1">数据库类型</label>
+                  <select id="db-type" class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-primary">
+                    <option value="sqlite">SQLite</option>
+                    <option value="mysql">MySQL</option>
+                    <option value="postgres">PostgreSQL</option>
+                    <option value="sqlserver">SQL Server</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-300 mb-1">主机</label>
+                  <input type="text" id="db-host" class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-primary" value="localhost">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-300 mb-1">端口</label>
+                  <input type="text" id="db-port" class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-primary" value="3306">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-300 mb-1">数据库名</label>
+                  <input type="text" id="db-name" class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-primary">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-300 mb-1">用户名</label>
+                  <input type="text" id="db-user" class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-primary">
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-300 mb-1">密码</label>
+                  <input type="password" id="db-password" class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-primary">
+                </div>
+                <div class="flex justify-end space-x-2 mt-4">
+                  <button id="test-connection-btn" class="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-md transition-all-200">
+                    测试连接
+                  </button>
+                  <button id="save-connection-btn" class="bg-primary hover:bg-blue-600 text-white px-4 py-2 rounded-md transition-all-200">
+                    保存连接
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- 用户菜单 -->
+        <div class="relative">
+          <button id="user-menu" class="hidden flex items-center space-x-2 text-white hover:text-gray-300 transition-all-200">
+            <!-- 用户信息将通过JavaScript动态添加 -->
+          </button>
+          <div id="user-dropdown" class="absolute right-0 mt-2 w-48 bg-dark border border-gray-700 rounded-md shadow-lg hidden z-10">
+            <div class="p-2">
+              <a href="#" id="profile-link" class="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-800 rounded-md transition-all-200">
+                <i class="fa fa-user mr-2"></i>个人资料
+              </a>
+              <a href="#" id="logout-link" class="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-800 rounded-md transition-all-200">
+                <i class="fa fa-sign-out mr-2"></i>退出登录
+              </a>
+            </div>
+          </div>
+        </div>
+        <div class="tooltip">
+          <button id="help-btn" class="text-gray-300 hover:text-white transition-all-200">
+            <i class="fa fa-question-circle text-xl"></i>
+          </button>
+          <span class="tooltip-text">帮助</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="flex-1 flex overflow-hidden">
+    <!-- Left Sidebar - SQL List -->
+    <aside class="w-64 bg-dark border-r border-gray-700 flex flex-col">
+      <!-- Search and Filters -->
+      <div class="p-4 border-b border-gray-700">
+        <div class="relative">
+          <input type="text" id="sql-search" placeholder="搜索SQL语句..." class="w-full bg-gray-800 border border-gray-700 rounded-md pl-10 pr-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-primary">
+          <i class="fa fa-search absolute left-3 top-3 text-gray-400"></i>
+        </div>
+        <div class="flex space-x-2 mt-3">
+          <select id="category-filter" class="flex-1 bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+            <option value="all">所有分类</option>
+          </select>
+          <select id="tag-filter" class="flex-1 bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+            <option value="all">所有标签</option>
+          </select>
+        </div>
+      </div>
+      
+      <!-- SQL List -->
+      <div id="sql-list-container" class="flex-1 overflow-y-auto scrollbar-thin">
+        <div id="sql-list" class="divide-y divide-gray-700">
+          <!-- SQL items will be dynamically added here -->
+        </div>
+      </div>
+      
+      <!-- Categories and Tags Management -->
+      <div class="p-4 border-t border-gray-700">
+        <div class="flex justify-between items-center mb-3">
+          <h3 class="text-sm font-medium text-gray-300">分类与标签</h3>
+          <button id="manage-categories-btn" class="text-xs text-primary hover:text-blue-400 transition-all-200">
+            管理
+          </button>
+        </div>
+        <div id="categories-list" class="flex flex-wrap gap-2 mb-3">
+          <!-- Categories will be dynamically added here -->
+        </div>
+        <div id="tags-list" class="flex flex-wrap gap-2">
+          <!-- Tags will be dynamically added here -->
+        </div>
+      </div>
+    </aside>
+    
+    <!-- Right Content Area -->
+    <div class="flex-1 flex flex-col overflow-hidden">
+      <!-- SQL Editor Toolbar -->
+      <div class="bg-dark border-b border-gray-700 p-3 flex justify-between items-center">
+        <div class="flex items-center space-x-2">
+          <button id="open-sql-btn" class="bg-gray-700 hover:bg-gray-600 text-white px-3 py-1 rounded-md text-sm flex items-center transition-all-200">
+            <i class="fa fa-folder-open mr-1"></i>打开
+          </button>
+          <button id="save-sql-btn" class="bg-primary hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm flex items-center transition-all-200">
+            <i class="fa fa-save mr-1"></i>保存
+          </button>
+          <button id="delete-sql-btn" class="bg-danger hover:bg-red-600 text-white px-3 py-1 rounded-md text-sm flex items-center transition-all-200">
+            <i class="fa fa-trash mr-1"></i>删除
+          </button>
+        </div>
+        <div class="flex items-center space-x-2">
+          <button id="execute-sql-btn" class="bg-secondary hover:bg-green-600 text-white px-4 py-1 rounded-md text-sm flex items-center transition-all-200">
+            <i class="fa fa-play mr-1"></i>执行
+          </button>
+          <div class="tooltip">
+            <button id="format-sql-btn" class="bg-gray-700 hover:bg-gray-600 text-white px-3 py-1 rounded-md text-sm flex items-center transition-all-200">
+              <i class="fa fa-indent"></i>
+            </button>
+            <span class="tooltip-text">格式化SQL</span>
+          </div>
+          <div class="tooltip">
+            <button id="template-sql-btn" class="bg-gray-700 hover:bg-gray-600 text-white px-3 py-1 rounded-md text-sm flex items-center transition-all-200">
+              <i class="fa fa-file-text-o"></i>
+            </button>
+            <span class="tooltip-text">SQL模板</span>
+          </div>
+        </div>
+      </div>
+      
+      <!-- SQL Editor and Results -->
+      <div class="flex-1 flex overflow-hidden">
+        <!-- SQL Editor -->
+        <div class="w-1/2 flex flex-col border-r border-gray-700">
+          <div class="p-3 bg-dark border-b border-gray-700 flex justify-between items-center">
+            <div class="flex items-center">
+              <input type="text" id="sql-title" placeholder="SQL标题..." class="bg-gray-800 border border-gray-700 rounded-md px-3 py-1 text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary w-64">
+              <select id="sql-category" class="ml-2 bg-gray-800 border border-gray-700 rounded-md px-3 py-1 text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+                <option value="uncategorized">未分类</option>
+              </select>
+            </div>
+            <div class="flex items-center">
+              <div class="relative">
+                <input type="text" id="add-tag-input" placeholder="添加标签..." class="bg-gray-800 border border-gray-700 rounded-md px-3 py-1 text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary w-40">
+                <button id="add-tag-btn" class="absolute right-1 top-1 text-primary hover:text-blue-400 transition-all-200">
+                  <i class="fa fa-plus-circle"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+          <div id="sql-editor-container" class="flex-1 p-4 overflow-hidden">
+            <textarea id="sql-editor"></textarea>
+          </div>
+        </div>
+        
+        <!-- Results and Notes -->
+        <div class="w-1/2 flex flex-col">
+          <div class="bg-dark border-b border-gray-700">
+            <div class="flex">
+              <button id="results-tab" class="flex-1 py-3 px-4 text-center text-primary border-b-2 border-primary font-medium">
+                执行结果
+              </button>
+              <button id="notes-tab" class="flex-1 py-3 px-4 text-center text-gray-400 hover:text-white transition-all-200">
+                备注
+              </button>
+            </div>
+          </div>
+          
+          <!-- Results Content -->
+          <div id="results-content" class="flex-1 overflow-hidden flex flex-col">
+            <div class="p-3 bg-dark border-b border-gray-700 flex justify-between items-center">
+              <div id="execution-status" class="text-sm text-gray-400">
+                就绪
+              </div>
+              <div class="flex items-center space-x-2">
+                <button id="export-results-btn" class="bg-gray-700 hover:bg-gray-600 text-white px-3 py-1 rounded-md text-xs flex items-center transition-all-200">
+                  <i class="fa fa-download mr-1"></i>导出
+                </button>
+                <select id="export-format" class="bg-gray-800 border border-gray-700 rounded-md px-2 py-1 text-white text-xs focus:outline-none focus:ring-2 focus:ring-primary">
+                  <option value="csv">CSV</option>
+                  <option value="json">JSON</option>
+                  <option value="excel">Excel</option>
+                </select>
+              </div>
+            </div>
+            <div id="sql-result-container" class="flex-1 p-4 overflow-auto scrollbar-thin">
+              <!-- Results will be displayed here -->
+              <div id="no-results-message" class="flex flex-col items-center justify-center h-full text-gray-400">
+                <i class="fa fa-table text-4xl mb-2"></i>
+                <p>执行SQL语句后将显示结果</p>
+              </div>
+              <div id="sql-results" class="hidden"></div>
+            </div>
+          </div>
+          
+          <!-- Notes Content -->
+          <div id="notes-content" class="flex-1 overflow-hidden hidden">
+            <div class="flex-1 p-4 overflow-auto scrollbar-thin">
+              <textarea id="sql-notes" class="w-full h-full bg-gray-800 border border-gray-700 rounded-md p-3 text-white focus:outline-none focus:ring-2 focus:ring-primary" placeholder="在此添加SQL语句的备注信息..."></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Modals -->
+  <!-- New SQL Modal -->
+  <div id="new-sql-modal" class="modal">
+    <div class="modal-content p-6">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-bold text-light">新建SQL语句</h2>
+        <button class="close-modal text-gray-400 hover:text-white">
+          <i class="fa fa-times"></i>
+        </button>
+      </div>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-300 mb-1">标题</label>
+          <input type="text" id="new-sql-title" class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-primary" placeholder="输入SQL语句标题">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-300 mb-1">分类</label>
+          <select id="new-sql-category" class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-primary">
+            <option value="uncategorized">未分类</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-300 mb-1">标签</label>
+          <div class="flex">
+            <input type="text" id="new-sql-tags" class="flex-1 bg-gray-800 border border-gray-700 rounded-l-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-primary" placeholder="输入标签，用逗号分隔">
+            <button id="create-sql-btn" class="bg-primary hover:bg-blue-600 text-white px-4 py-2 rounded-r-md transition-all-200">
+              创建
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Manage Categories Modal -->
+  <div id="manage-categories-modal" class="modal">
+    <div class="modal-content p-6">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-bold text-light">管理分类与标签</h2>
+        <button class="close-modal text-gray-400 hover:text-white">
+          <i class="fa fa-times"></i>
+        </button>
+      </div>
+      <div class="space-y-6">
+        <!-- Categories Management -->
+        <div>
+          <div class="flex justify-between items-center mb-3">
+            <h3 class="text-lg font-medium text-light">分类</h3>
+            <button id="add-category-btn" class="bg-primary hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm flex items-center transition-all-200">
+              <i class="fa fa-plus mr-1"></i>添加分类
+            </button>
+          </div>
+          <div id="manage-categories-list" class="space-y-2">
+            <!-- Categories will be dynamically added here -->
+          </div>
+        </div>
+        
+        <!-- Tags Management -->
+        <div>
+          <div class="flex justify-between items-center mb-3">
+            <h3 class="text-lg font-medium text-light">标签</h3>
+            <button id="add-tag-modal-btn" class="bg-primary hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm flex items-center transition-all-200">
+              <i class="fa fa-plus mr-1"></i>添加标签
+            </button>
+          </div>
+          <div id="manage-tags-list" class="flex flex-wrap gap-2">
+            <!-- Tags will be dynamically added here -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SQL Template Modal -->
+  <div id="sql-template-modal" class="modal">
+    <div class="modal-content p-6">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-bold text-light">SQL模板</h2>
+        <button class="close-modal text-gray-400 hover:text-white">
+          <i class="fa fa-times"></i>
+        </button>
+      </div>
+      <div class="space-y-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="bg-gray-800 border border-gray-700 rounded-md p-4 hover:border-primary cursor-pointer transition-all-200 template-item" data-template="select">
+            <h3 class="font-medium text-light mb-2">SELECT 语句</h3>
+            <pre class="text-sm text-gray-300 overflow-hidden">SELECT column1, column2 FROM table WHERE condition;</pre>
+          </div>
+          <div class="bg-gray-800 border border-gray-700 rounded-md p-4 hover:border-primary cursor-pointer transition-all-200 template-item" data-template="insert">
+            <h3 class="font-medium text-light mb-2">INSERT 语句</h3>
+            <pre class="text-sm text-gray-300 overflow-hidden">INSERT INTO table (column1, column2) VALUES (value1, value2);</pre>
+          </div>
+          <div class="bg-gray-800 border border-gray-700 rounded-md p-4 hover:border-primary cursor-pointer transition-all-200 template-item" data-template="update">
+            <h3 class="font-medium text-light mb-2">UPDATE 语句</h3>
+            <pre class="text-sm text-gray-300 overflow-hidden">UPDATE table SET column1 = value1 WHERE condition;</pre>
+          </div>
+          <div class="bg-gray-800 border border-gray-700 rounded-md p-4 hover:border-primary cursor-pointer transition-all-200 template-item" data-template="delete">
+            <h3 class="font-medium text-light mb-2">DELETE 语句</h3>
+            <pre class="text-sm text-gray-300 overflow-hidden">DELETE FROM table WHERE condition;</pre>
+          </div>
+          <div class="bg-gray-800 border border-gray-700 rounded-md p-4 hover:border-primary cursor-pointer transition-all-200 template-item" data-template="join">
+            <h3 class="font-medium text-light mb-2">JOIN 语句</h3>
+            <pre class="text-sm text-gray-300 overflow-hidden">SELECT t1.column1, t2.column2 FROM table1 t1 JOIN table2 t2 ON t1.id = t2.table1_id;</pre>
+          </div>
+          <div class="bg-gray-800 border border-gray-700 rounded-md p-4 hover:border-primary cursor-pointer transition-all-200 template-item" data-template="cte">
+            <h3 class="font-medium text-light mb-2">CTE 语句</h3>
+            <pre class="text-sm text-gray-300 overflow-hidden">WITH cte AS (SELECT * FROM table) SELECT * FROM cte;</pre>
+          </div>
+        </div>
+        <div>
+          <h3 class="text-lg font-medium text-light mb-3">自定义模板</h3>
+          <div class="space-y-3">
+            <div class="flex">
+              <input type="text" id="custom-template-name" class="flex-1 bg-gray-800 border border-gray-700 rounded-l-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-primary" placeholder="模板名称">
+              <button id="save-custom-template-btn" class="bg-primary hover:bg-blue-600 text-white px-4 py-2 rounded-r-md transition-all-200">
+                保存模板
+              </button>
+            </div>
+            <textarea id="custom-template-content" class="w-full h-32 bg-gray-800 border border-gray-700 rounded-md p-3 text-white focus:outline-none focus:ring-2 focus:ring-primary" placeholder="在此输入自定义SQL模板内容..."></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Help Modal -->
+  <div id="help-modal" class="modal">
+    <div class="modal-content p-6">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-bold text-light">使用帮助</h2>
+        <button class="close-modal text-gray-400 hover:text-white">
+          <i class="fa fa-times"></i>
+        </button>
+      </div>
+      <div class="space-y-4">
+        <div>
+          <h3 class="text-lg font-medium text-light mb-2">基本操作</h3>
+          <ul class="list-disc pl-5 text-gray-300 space-y-1">
+            <li>点击"新建SQL"按钮创建新的SQL语句</li>
+            <li>在左侧列表中选择SQL语句进行编辑</li>
+            <li>使用顶部工具栏的按钮保存或执行SQL语句</li>
+            <li>在右侧面板查看执行结果、添加备注或评论</li>
+          </ul>
+        </div>
+        <div>
+          <h3 class="text-lg font-medium text-light mb-2">多用户协作</h3>
+          <ul class="list-disc pl-5 text-gray-300 space-y-1">
+            <li>登录后可以创建和修改自己的SQL语句</li>
+            <li>可以查看其他用户创建的SQL语句</li>
+            <li>可以对SQL语句进行评论和讨论</li>
+            <li>可以通过分享按钮将SQL语句分享给其他用户</li>
+          </ul>
+        </div>
+        <div>
+          <h3 class="text-lg font-medium text-light mb-2">SQL模板</h3>
+          <p class="text-gray-300 mb-2">点击工具栏上的模板按钮，可以快速插入常用SQL模板。您也可以创建自定义模板。</p>
+          <p class="text-gray-300">模板中可以使用{{parameter}}语法定义参数，执行时会提示输入参数值。</p>
+        </div>
+        <div>
+          <h3 class="text-lg font-medium text-light mb-2">数据库连接</h3>
+          <p class="text-gray-300">点击顶部的数据库连接按钮，配置并连接到您的数据库。目前支持SQLite、MySQL、PostgreSQL和SQL Server。</p>
+        </div>
+        <div>
+          <h3 class="text-lg font-medium text-light mb-2">快捷键</h3>
+          <div class="grid grid-cols-2 gap-2 text-gray-300">
+            <div><span class="font-medium">Ctrl+S</span> - 保存SQL语句</div>
+            <div><span class="font-medium">Ctrl+Enter</span> - 执行SQL语句</div>
+            <div><span class="font-medium">Ctrl+N</span> - 新建SQL语句</div>
+            <div><span class="font-medium">Ctrl+O</span> - 打开SQL语句</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Auth Modal -->
+  <div id="auth-modal" class="modal">
+    <div class="modal-content p-6 max-w-md w-full">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-bold text-light">用户登录</h2>
+        <button class="close-modal text-gray-400 hover:text-white">
+          <i class="fa fa-times"></i>
+        </button>
+      </div>
+      
+      <!-- 登录表单 -->
+      <div id="login-form-container">
+        <form id="login-form" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-300 mb-1">邮箱</label>
+            <input type="email" id="login-email" class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-primary" placeholder="请输入邮箱" required>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-300 mb-1">密码</label>
+            <input type="password" id="login-password" class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-primary" placeholder="请输入密码" required>
+          </div>
+          <div class="flex justify-between items-center">
+            <a href="#" id="forgot-password" class="text-sm text-primary hover:text-blue-400 transition-all-200">忘记密码？</a>
+            <button type="submit" class="bg-primary hover:bg-blue-600 text-white px-4 py-2 rounded-md transition-all-200">
+              登录
+            </button>
+          </div>
+        </form>
+        
+        <div class="mt-6">
+          <div class="relative flex items-center justify-center">
+            <div class="flex-grow border-t border-gray-700"></div>
+            <span class="flex-shrink mx-4 text-gray-400 text-sm">或使用以下方式登录</span>
+            <div class="flex-grow border-t border-gray-700"></div>
+          </div>
+          
+          <div class="mt-6 grid grid-cols-2 gap-3">
+            <button id="google-login" class="flex justify-center items-center py-2 px-4 border border-gray-700 rounded-md shadow-sm bg-gray-800 hover:bg-gray-700 transition-all-200">
+              <i class="fa fa-google text-red-500 mr-2"></i>
+              <span>Google</span>
+            </button>
+            <button id="github-login" class="flex justify-center items-center py-2 px-4 border border-gray-700 rounded-md shadow-sm bg-gray-800 hover:bg-gray-700 transition-all-200">
+              <i class="fa fa-github text-gray-300 mr-2"></i>
+              <span>GitHub</span>
+            </button>
+          </div>
+        </div>
+        
+        <div class="mt-6 text-center">
+          <p class="text-sm text-gray-400">
+            还没有账号？ <a href="#" id="show-register-form" class="text-primary hover:text-blue-400 transition-all-200">立即注册</a>
+          </p>
+        </div>
+      </div>
+      
+      <!-- 注册表单 -->
+      <div id="register-form-container" class="hidden">
+        <form id="register-form" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-300 mb-1">显示名称</label>
+            <input type="text" id="register-name" class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-primary" placeholder="请输入显示名称" required>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-300 mb-1">邮箱</label>
+            <input type="email" id="register-email" class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-primary" placeholder="请输入邮箱" required>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-300 mb-1">密码</label>
+            <input type="password" id="register-password" class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-primary" placeholder="请输入密码（至少6位）" required minlength="6">
+          </div>
+          <div class="flex justify-end">
+            <button type="submit" class="bg-primary hover:bg-blue-600 text-white px-4 py-2 rounded-md transition-all-200">
+              注册
+            </button>
+          </div>
+        </form>
+        
+        <div class="mt-6 text-center">
+          <p class="text-sm text-gray-400">
+            已有账号？ <a href="#" id="show-login-form" class="text-primary hover:text-blue-400 transition-all-200">立即登录</a>
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Share Modal -->
+  <div id="share-modal" class="modal">
+    <div class="modal-content p-6 max-w-md w-full">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-bold text-light">分享SQL语句</h2>
+        <button class="close-modal text-gray-400 hover:text-white">
+          <i class="fa fa-times"></i>
+        </button>
+      </div>
+      <div class="space-y-4">
+        <p class="text-gray-300">复制以下链接分享给其他用户：</p>
+        <div class="flex">
+          <input type="text" id="share-link" class="flex-1 bg-gray-800 border border-gray-700 rounded-l-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-primary" readonly>
+          <button id="copy-share-link" class="bg-primary hover:bg-blue-600 text-white px-4 py-2 rounded-r-md transition-all-200">
+            复制
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Loading Modal -->
+  <div id="loading-modal" class="modal">
+    <div class="modal-content p-6 max-w-sm w-full bg-dark bg-opacity-90">
+      <div class="flex flex-col items-center justify-center">
+        <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mb-4"></div>
+        <p id="loading-message" class="text-light text-center">加载中...</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notification -->
+  <div id="notification" class="notification">
+    <div class="flex items-start">
+      <i id="notification-icon" class="fa fa-check-circle text-secondary mr-3 mt-0.5"></i>
+      <div>
+        <h4 id="notification-title" class="font-medium text-light"></h4>
+        <p id="notification-message" class="text-sm text-gray-300 mt-1"></p>
+      </div>
+      <button id="close-notification" class="text-gray-400 hover:text-white ml-4">
+        <i class="fa fa-times"></i>
+      </button>
+    </div>
+  </div>
+  
+  <!-- 添加分享按钮到工具栏 -->
+  <script>
+    // 添加分享按钮到工具栏
+    document.addEventListener('DOMContentLoaded', function() {
+      const toolbarRight = document.querySelector('.bg-dark.border-b.border-gray-700.p-3.flex.justify-between.items-center .flex.items-center.space-x-2');
+      
+      const shareBtn = document.createElement('button');
+      shareBtn.id = 'share-sql-btn';
+      shareBtn.className = 'bg-gray-700 hover:bg-gray-600 text-white px-3 py-1 rounded-md text-sm flex items-center transition-all-200';
+      shareBtn.innerHTML = '<i class="fa fa-share-alt mr-1"></i>分享';
+      
+      toolbarRight.insertBefore(shareBtn, toolbarRight.firstChild);
+      
+      // 添加评论标签页点击事件
+      document.getElementById('comments-tab').addEventListener('click', function() {
+        document.querySelectorAll('#results-tab, #notes-tab, #comments-tab').forEach(tab => {
+          tab.classList.remove('text-primary', 'border-b-2', 'border-primary', 'font-medium');
+          tab.classList.add('text-gray-400');
+        });
+        
+        this.classList.add('text-primary', 'border-b-2', 'border-primary', 'font-medium');
+        this.classList.remove('text-gray-400');
+        
+        document.getElementById('results-content').classList.add('hidden');
+        document.getElementById('notes-content').classList.add('hidden');
+        document.getElementById('comments-content').classList.remove('hidden');
+        
+        // 加载评论
+        loadComments();
+      });
+      
+      // 添加退出登录事件
+      document.getElementById('logout-link').addEventListener('click', async function(e) {
+        e.preventDefault();
+        await auth.signOut();
+      });
+      
+      // 检查URL参数
+      checkUrlParams();
+    });
+    
+    // 加载评论
+    function loadComments() {
+      if (!currentSqlId) {
+        return;
+      }
+      
+      const commentsList = document.getElementById('comments-list');
+      
+      // 显示加载状态
+      commentsList.innerHTML = `
+        <div class="flex justify-center items-center h-32">
+          <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+        </div>
+      `;
+      
+      // 从Firebase加载评论
+      db.collection('sqlSnippets').doc(currentSqlId).collection('comments')
+        .orderBy('createdAt', 'asc')
+        .get()
+        .then((snapshot) => {
+          if (snapshot.empty) {
+            commentsList.innerHTML = `
+              <div class="text-center text-gray-400 py-8">
+                <i class="fa fa-comments-o text-2xl mb-2"></i>
+                <p>暂无评论</p>
+              </div>
+            `;
+            return;
+          }
+          
+          commentsList.innerHTML = '';
+          
+          snapshot.forEach((doc) => {
+            const comment = doc.data();
+            
+            const commentElement = document.createElement('div');
+            commentElement.className = 'bg-gray-800 border border-gray-700 rounded-md p-4 mb-3';
+            
+            commentElement.innerHTML = `
+              <div class="flex justify-between items-start">
+                <div class="flex items-center">
+                  <img src="${comment.createdBy.photoURL || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(comment.createdBy.displayName || 'Unknown')}" alt="Avatar" class="w-8 h-8 rounded-full mr-2">
+                  <div>
+                    <div class="font-medium text-light">${comment.createdBy.displayName || 'Unknown User'}</div>
+                    <div class="text-xs text-gray-400">${formatDate(comment.createdAt)}</div>
+                  </div>
+                </div>
+                ${currentUser && comment.createdBy && comment.createdBy.id === currentUser.uid ? `
+                  <button class="delete-comment-btn text-gray-400 hover:text-danger transition-all-200" data-id="${doc.id}">
+                    <i class="fa fa-trash"></i>
+                  </button>
+                ` : ''}
+              </div>
+              <div class="mt-2 text-gray-300">${comment.text}</div>
+            `;
+            
+            commentsList.appendChild(commentElement);
+          });
+          
+          // 添加删除评论事件
+          document.querySelectorAll('.delete-comment-btn').forEach(button => {
+            button.addEventListener('click', async function() {
+              const commentId = this.getAttribute('data-id');
+              
+              if (confirm('确定要删除这条评论吗？')) {
+                try {
+                  await db.collection('sqlSnippets').doc(currentSqlId).collection('comments').doc(commentId).delete();
+                  showNotification('成功', '评论已删除', 'success');
+                  loadComments();
+                } catch (error) {
+                  console.error('Error deleting comment:', error);
+                  showNotification('错误', '删除评论失败: ' + error.message, 'error');
+                }
+              }
+            });
+          });
+        })
+        .catch((error) => {
+          console.error('Error loading comments:', error);
+          commentsList.innerHTML = `
+            <div class="text-center text-danger py-8">
+              <i class="fa fa-exclamation-circle text-2xl mb-2"></i>
+              <p>加载评论失败</p>
+            </div>
+          `;
+        });
+    }
+  </script>
+
+  <script>
+    // Firebase配置
+    const firebaseConfig = {
+      apiKey: "AIzaSyCwPZ4Q9QZ7Z7Z7Z7Z7Z7Z7Z7Z7Z7Z7Z7Z7",
+      authDomain: "sql-manager-1234.firebaseapp.com",
+      projectId: "sql-manager-1234",
+      storageBucket: "sql-manager-1234.appspot.com",
+      messagingSenderId: "1234567890",
+      appId: "1:1234567890:web:1234567890123456789012"
+    };
+    
+    // 初始化Firebase
+    const app = firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+    
+    // 全局变量
+    let sqlEditor;
+    let currentSqlId = null;
+    let sqlItems = [];
+    let categories = ['未分类'];
+    let tags = [];
+    let customTemplates = [];
+    let dbConnection = null;
+    let currentUser = null;
+    let unsubscribeSqlItems = null;
+    let unsubscribeCategories = null;
+    let unsubscribeTags = null;
+    
+    // DOM元素
+    const sqlList = document.getElementById('sql-list');
+    const sqlTitle = document.getElementById('sql-title');
+    const sqlCategory = document.getElementById('sql-category');
+    const sqlNotes = document.getElementById('sql-notes');
+    const sqlSearch = document.getElementById('sql-search');
+    const categoryFilter = document.getElementById('category-filter');
+    const tagFilter = document.getElementById('tag-filter');
+    const categoriesList = document.getElementById('categories-list');
+    const tagsList = document.getElementById('tags-list');
+    const resultsTab = document.getElementById('results-tab');
+    const notesTab = document.getElementById('notes-tab');
+    const resultsContent = document.getElementById('results-content');
+    const notesContent = document.getElementById('notes-content');
+    const executionStatus = document.getElementById('execution-status');
+    const sqlResultContainer = document.getElementById('sql-result-container');
+    const noResultsMessage = document.getElementById('no-results-message');
+    const sqlResults = document.getElementById('sql-results');
+    const notification = document.getElementById('notification');
+    const notificationTitle = document.getElementById('notification-title');
+    const notificationMessage = document.getElementById('notification-message');
+    const notificationIcon = document.getElementById('notification-icon');
+    
+    // 初始化函数
+    function initialize() {
+      // 初始化SQL编辑器
+      initSqlEditor();
+      
+      // 加载数据
+      loadData();
+      
+      // 初始化事件监听
+      initEventListeners();
+      
+      // 初始化UI
+      updateUI();
+    }
+    
+    // 初始化SQL编辑器
+    function initSqlEditor() {
+      sqlEditor = CodeMirror.fromTextArea(document.getElementById('sql-editor'), {
+        mode: 'text/x-sql',
+        theme: 'dracula',
+        lineNumbers: true,
+        matchBrackets: true,
+        autoCloseBrackets: true,
+        indentUnit: 2,
+        tabSize: 2,
+        lineWrapping: true,
+        extraKeys: {
+          'Ctrl-Enter': executeSql,
+          'Cmd-Enter': executeSql,
+          'Ctrl-S': saveSql,
+          'Cmd-S': saveSql
+        }
+      });
+      
+      // 设置编辑器高度
+      setTimeout(() => {
+        sqlEditor.setSize('100%', '100%');
+      }, 100);
+    }
+    
+    // 加载数据
+    function loadData() {
+      // 从localStorage加载本地数据
+      const savedTemplates = localStorage.getItem('customTemplates');
+      const savedDbConnection = localStorage.getItem('dbConnection');
+      
+      if (savedTemplates) {
+        customTemplates = JSON.parse(savedTemplates);
+      }
+      
+      if (savedDbConnection) {
+        dbConnection = JSON.parse(savedDbConnection);
+        document.getElementById('current-db').textContent = `${dbConnection.type} - ${dbConnection.name}`;
+      }
+      
+      // 如果用户已登录，从Firebase加载共享数据
+      if (currentUser) {
+        loadDataFromFirebase();
+      }
+    }
+    
+    // 从Firebase加载数据
+    function loadDataFromFirebase() {
+      // 显示加载状态
+      showLoading('正在加载数据...');
+      
+      // 加载SQL语句
+      unsubscribeSqlItems = db.collection('sqlSnippets')
+        .orderBy('updatedAt', 'desc')
+        .onSnapshot((snapshot) => {
+          sqlItems = [];
+          snapshot.forEach((doc) => {
+            sqlItems.push({
+              id: doc.id,
+              ...doc.data()
+            });
+          });
+          updateUI();
+        }, (error) => {
+          console.error('Error loading SQL items:', error);
+          showNotification('错误', '加载SQL语句失败', 'error');
+          hideLoading();
+        });
+      
+      // 加载分类
+      unsubscribeCategories = db.collection('categories')
+        .orderBy('name')
+        .onSnapshot((snapshot) => {
+          categories = ['未分类'];
+          snapshot.forEach((doc) => {
+            categories.push(doc.data().name);
+          });
+          updateUI();
+        }, (error) => {
+          console.error('Error loading categories:', error);
+          showNotification('错误', '加载分类失败', 'error');
+          hideLoading();
+        });
+      
+      // 加载标签
+      unsubscribeTags = db.collection('tags')
+        .orderBy('name')
+        .onSnapshot((snapshot) => {
+          tags = [];
+          snapshot.forEach((doc) => {
+            tags.push(doc.data().name);
+          });
+          updateUI();
+          hideLoading();
+        }, (error) => {
+          console.error('Error loading tags:', error);
+          showNotification('错误', '加载标签失败', 'error');
+          hideLoading();
+        });
+    }
+    
+    // 停止从Firebase加载数据
+    function stopLoadingFromFirebase() {
+      if (unsubscribeSqlItems) {
+        unsubscribeSqlItems();
+        unsubscribeSqlItems = null;
+      }
+      
+      if (unsubscribeCategories) {
+        unsubscribeCategories();
+        unsubscribeCategories = null;
+      }
+      
+      if (unsubscribeTags) {
+        unsubscribeTags();
+        unsubscribeTags = null;
+      }
+    }
+    
+    // 保存数据
+    function saveData() {
+      // 保存本地数据到localStorage
+      localStorage.setItem('customTemplates', JSON.stringify(customTemplates));
+      
+      if (dbConnection) {
+        localStorage.setItem('dbConnection', JSON.stringify(dbConnection));
+      }
+    }
+    
+    // 保存SQL语句到Firebase
+    async function saveSqlToFirebase(sqlItem) {
+      try {
+        if (sqlItem.id) {
+          // 更新现有SQL语句
+          await db.collection('sqlSnippets').doc(sqlItem.id).update({
+            ...sqlItem,
+            updatedBy: {
+              id: currentUser.uid,
+              displayName: currentUser.displayName || currentUser.email,
+              photoURL: currentUser.photoURL
+            },
+            updatedAt: new Date().toISOString()
+          });
+          showNotification('成功', 'SQL语句更新成功', 'success');
+        } else {
+          // 创建新SQL语句
+          const newDoc = await db.collection('sqlSnippets').add({
+            ...sqlItem,
+            createdBy: {
+              id: currentUser.uid,
+              displayName: currentUser.displayName || currentUser.email,
+              photoURL: currentUser.photoURL
+            },
+            updatedBy: {
+              id: currentUser.uid,
+              displayName: currentUser.displayName || currentUser.email,
+              photoURL: currentUser.photoURL
+            },
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          });
+          
+          // 更新本地ID
+          sqlItem.id = newDoc.id;
+          showNotification('成功', 'SQL语句创建成功', 'success');
+        }
+        return true;
+      } catch (error) {
+        console.error('Error saving SQL item:', error);
+        showNotification('错误', '保存SQL语句失败: ' + error.message, 'error');
+        return false;
+      }
+    }
+    
+    // 删除SQL语句从Firebase
+    async function deleteSqlFromFirebase(sqlId) {
+      try {
+        await db.collection('sqlSnippets').doc(sqlId).delete();
+        showNotification('成功', 'SQL语句已删除', 'success');
+        return true;
+      } catch (error) {
+        console.error('Error deleting SQL item:', error);
+        showNotification('错误', '删除SQL语句失败: ' + error.message, 'error');
+        return false;
+      }
+    }
+    
+    // 添加分类到Firebase
+    async function addCategoryToFirebase(categoryName) {
+      try {
+        // 检查分类是否已存在
+        const snapshot = await db.collection('categories')
+          .where('name', '==', categoryName)
+          .get();
+        
+        if (!snapshot.empty) {
+          showNotification('提示', '分类已存在', 'info');
+          return false;
+        }
+        
+        // 添加新分类
+        await db.collection('categories').add({
+          name: categoryName,
+          createdBy: {
+            id: currentUser.uid,
+            displayName: currentUser.displayName || currentUser.email,
+            photoURL: currentUser.photoURL
+          },
+          createdAt: new Date().toISOString()
+        });
+        
+        showNotification('成功', `分类"${categoryName}"已添加`, 'success');
+        return true;
+      } catch (error) {
+        console.error('Error adding category:', error);
+        showNotification('错误', '添加分类失败: ' + error.message, 'error');
+        return false;
+      }
+    }
+    
+    // 删除分类从Firebase
+    async function deleteCategoryFromFirebase(categoryName) {
+      try {
+        // 检查是否有SQL语句使用此分类
+        const sqlSnapshot = await db.collection('sqlSnippets')
+          .where('category', '==', categoryName)
+          .get();
+        
+        if (!sqlSnapshot.empty) {
+          // 更新使用此分类的SQL语句
+          const batch = db.batch();
+          sqlSnapshot.forEach((doc) => {
+            batch.update(doc.ref, {
+              category: '未分类',
+              updatedBy: {
+                id: currentUser.uid,
+                displayName: currentUser.displayName || currentUser.email,
+                photoURL: currentUser.photoURL
+              },
+              updatedAt: new Date().toISOString()
+            });
+          });
+          await batch.commit();
+        }
+        
+        // 删除分类
+        const categorySnapshot = await db.collection('categories')
+          .where('name', '==', categoryName)
+          .get();
+        
+        const batch = db.batch();
+        categorySnapshot.forEach((doc) => {
+          batch.delete(doc.ref);
+        });
+        await batch.commit();
+        
+        showNotification('成功', `分类"${categoryName}"已删除`, 'success');
+        return true;
+      } catch (error) {
+        console.error('Error deleting category:', error);
+        showNotification('错误', '删除分类失败: ' + error.message, 'error');
+        return false;
+      }
+    }
+    
+    // 添加标签到Firebase
+    async function addTagToFirebase(tagName) {
+      try {
+        // 检查标签是否已存在
+        const snapshot = await db.collection('tags')
+          .where('name', '==', tagName)
+          .get();
+        
+        if (!snapshot.empty) {
+          showNotification('提示', '标签已存在', 'info');
+          return false;
+        }
+        
+        // 添加新标签
+        await db.collection('tags').add({
+          name: tagName,
+          createdBy: {
+            id: currentUser.uid,
+            displayName: currentUser.displayName || currentUser.email,
+            photoURL: currentUser.photoURL
+          },
+          createdAt: new Date().toISOString()
+        });
+        
+        showNotification('成功', `标签"${tagName}"已添加`, 'success');
+        return true;
+      } catch (error) {
+        console.error('Error adding tag:', error);
+        showNotification('错误', '添加标签失败: ' + error.message, 'error');
+        return false;
+      }
+    }
+    
+    // 删除标签从Firebase
+    async function deleteTagFromFirebase(tagName) {
+      try {
+        // 从所有SQL语句中移除此标签
+        const sqlSnapshot = await db.collection('sqlSnippets')
+          .where('tags', 'array-contains', tagName)
+          .get();
+        
+        const batch = db.batch();
+        sqlSnapshot.forEach((doc) => {
+          const sqlItem = doc.data();
+          const updatedTags = sqlItem.tags.filter(tag => tag !== tagName);
+          
+          batch.update(doc.ref, {
+            tags: updatedTags,
+            updatedBy: {
+              id: currentUser.uid,
+              displayName: currentUser.displayName || currentUser.email,
+              photoURL: currentUser.photoURL
+            },
+            updatedAt: new Date().toISOString()
+          });
+        });
+        await batch.commit();
+        
+        // 删除标签
+        const tagSnapshot = await db.collection('tags')
+          .where('name', '==', tagName)
+          .get();
+        
+        const tagBatch = db.batch();
+        tagSnapshot.forEach((doc) => {
+          tagBatch.delete(doc.ref);
+        });
+        await tagBatch.commit();
+        
+        showNotification('成功', `标签"${tagName}"已删除`, 'success');
+        return true;
+      } catch (error) {
+        console.error('Error deleting tag:', error);
+        showNotification('错误', '删除标签失败: ' + error.message, 'error');
+        return false;
+      }
+    }
+    
+    // 初始化事件监听
+    function initEventListeners() {
+      // 初始化Firebase认证监听
+      initAuthListeners();
+      
+      // 初始化登录/注册表单事件
+      initAuthFormListeners();
+      
+      // 初始化协作功能事件
+      initCollaborationListeners();
+      // 新建SQL按钮
+      document.getElementById('new-sql-btn').addEventListener('click', () => {
+        document.getElementById('new-sql-modal').classList.add('show');
+      });
+      
+      // 创建SQL按钮
+      document.getElementById('create-sql-btn').addEventListener('click', createNewSql);
+      
+      // 保存SQL按钮
+      document.getElementById('save-sql-btn').addEventListener('click', saveSql);
+      
+      // 删除SQL按钮
+      document.getElementById('delete-sql-btn').addEventListener('click', deleteSql);
+      
+      // 执行SQL按钮
+      document.getElementById('execute-sql-btn').addEventListener('click', executeSql);
+      
+      // 格式化SQL按钮
+      document.getElementById('format-sql-btn').addEventListener('click', formatSql);
+      
+      // SQL模板按钮
+      document.getElementById('template-sql-btn').addEventListener('click', () => {
+        document.getElementById('sql-template-modal').classList.add('show');
+      });
+      
+      // 帮助按钮
+      document.getElementById('help-btn').addEventListener('click', () => {
+        document.getElementById('help-modal').classList.add('show');
+      });
+      
+      // 数据库连接按钮
+      document.getElementById('db-connection-btn').addEventListener('click', () => {
+        document.getElementById('db-connection-dropdown').classList.toggle('hidden');
+      });
+      
+      // 测试连接按钮
+      document.getElementById('test-connection-btn').addEventListener('click', testDbConnection);
+      
+      // 保存连接按钮
+      document.getElementById('save-connection-btn').addEventListener('click', saveDbConnection);
+      
+      // 管理分类按钮
+      document.getElementById('manage-categories-btn').addEventListener('click', () => {
+        document.getElementById('manage-categories-modal').classList.add('show');
+      });
+      
+      // 添加分类按钮
+      document.getElementById('add-category-btn').addEventListener('click', addNewCategory);
+      
+      // 添加标签按钮
+      document.getElementById('add-tag-btn').addEventListener('click', addTagToSql);
+      document.getElementById('add-tag-modal-btn').addEventListener('click', addNewTag);
+      
+      // 导出结果按钮
+      document.getElementById('export-results-btn').addEventListener('click', exportResults);
+      
+      // 保存自定义模板按钮
+      document.getElementById('save-custom-template-btn').addEventListener('click', saveCustomTemplate);
+      
+      // 标签输入框回车事件
+      document.getElementById('add-tag-input').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          addTagToSql();
+        }
+      });
+      
+      // 搜索框事件
+      sqlSearch.addEventListener('input', filterSqlItems);
+      categoryFilter.addEventListener('change', filterSqlItems);
+      tagFilter.addEventListener('change', filterSqlItems);
+      
+      // 标签页切换
+      resultsTab.addEventListener('click', () => {
+        resultsTab.classList.add('text-primary', 'border-b-2', 'border-primary', 'font-medium');
+        resultsTab.classList.remove('text-gray-400');
+        notesTab.classList.add('text-gray-400');
+        notesTab.classList.remove('text-primary', 'border-b-2', 'border-primary', 'font-medium');
+        resultsContent.classList.remove('hidden');
+        notesContent.classList.add('hidden');
+      });
+      
+      notesTab.addEventListener('click', () => {
+        notesTab.classList.add('text-primary', 'border-b-2', 'border-primary', 'font-medium');
+        notesTab.classList.remove('text-gray-400');
+        resultsTab.classList.add('text-gray-400');
+        resultsTab.classList.remove('text-primary', 'border-b-2', 'border-primary', 'font-medium');
+        notesContent.classList.remove('hidden');
+        resultsContent.classList.add('hidden');
+      });
+      
+      // 关闭通知
+      document.getElementById('close-notification').addEventListener('click', () => {
+        notification.classList.remove('show');
+      });
+      
+      // 关闭模态框
+      document.querySelectorAll('.close-modal').forEach(button => {
+        button.addEventListener('click', () => {
+          document.querySelectorAll('.modal').forEach(modal => {
+            modal.classList.remove('show');
+          }).catch(function(error) {
+          showNotification('错误', 'Tabulator库加载失败: ' + error.message, 'error');
+        });
+        }).catch(function(error) {
+          showNotification('错误', 'Tabulator库加载失败: ' + error.message, 'error');
+        });
+      });
+      
+      // 点击模态框外部关闭
+      document.querySelectorAll('.modal').forEach(modal => {
+        modal.addEventListener('click', (e) => {
+          if (e.target === modal) {
+            modal.classList.remove('show');
+          }
+        }).catch(function(error) {
+          showNotification('错误', 'Tabulator库加载失败: ' + error.message, 'error');
+        });
+      });
+      
+      // 模板项点击事件
+      document.querySelectorAll('.template-item').forEach(item => {
+        item.addEventListener('click', () => {
+          const templateType = item.getAttribute('data-template');
+          insertTemplate(templateType);
+          document.getElementById('sql-template-modal').classList.remove('show');
+        }).catch(function(error) {
+          showNotification('错误', 'Tabulator库加载失败: ' + error.message, 'error');
+        });
+      });
+      
+      // 自定义模板点击事件 (动态添加的元素)
+      document.getElementById('sql-template-modal').addEventListener('click', (e) => {
+        const customTemplateItem = e.target.closest('.custom-template-item');
+        if (customTemplateItem) {
+          const templateId = customTemplateItem.getAttribute('data-id');
+          const template = customTemplates.find(t => t.id === templateId);
+          if (template) {
+            sqlEditor.setValue(template.content);
+            document.getElementById('sql-template-modal').classList.remove('show');
+          }
+        }
+      });
+      
+      // 窗口大小改变时调整编辑器大小
+      window.addEventListener('resize', () => {
+        if (sqlEditor) {
+          sqlEditor.setSize('100%', '100%');
+        }
+      });
+      
+      // 快捷键
+      document.addEventListener('keydown', (e) => {
+        // Ctrl+N 新建SQL
+        if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+          e.preventDefault();
+          document.getElementById('new-sql-modal').classList.add('show');
+        }
+        
+        // Ctrl+O 打开SQL
+        if ((e.ctrlKey || e.metaKey) && e.key === 'o') {
+          e.preventDefault();
+          // 如果有SQL语句，打开第一个
+          if (sqlItems.length > 0) {
+            openSql(sqlItems[0].id);
+          }
+        }
+      });
+    }
+    
+    // 更新UI
+    function updateUI() {
+      renderSqlList();
+      renderCategories();
+      renderTags();
+      renderCategoryFilter();
+      renderTagFilter();
+      renderManageCategories();
+      renderManageTags();
+      renderCustomTemplates();
+    }
+    
+    // 渲染SQL列表
+    function renderSqlList(filteredItems = null) {
+      const itemsToRender = filteredItems || sqlItems;
+      sqlList.innerHTML = '';
+      
+      if (itemsToRender.length === 0) {
+        sqlList.innerHTML = `
+          <div class="p-4 text-center text-gray-400">
+            <i class="fa fa-file-text-o text-2xl mb-2"></i>
+            <p>没有保存的SQL语句</p>
+            <button id="empty-state-new-btn" class="mt-3 bg-primary hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm transition-all-200">
+              新建SQL语句
+            </button>
+          </div>
+        `;
+        
+        // 添加新建按钮事件
+        document.getElementById('empty-state-new-btn').addEventListener('click', () => {
+          document.getElementById('new-sql-modal').classList.add('show');
+        }).catch(function(error) {
+          showNotification('错误', 'Tabulator库加载失败: ' + error.message, 'error');
+        });
+        
+        return;
+      }
+      
+      itemsToRender.forEach(item => {
+        const sqlItem = document.createElement('div');
+        sqlItem.className = `p-4 hover:bg-gray-800 cursor-pointer transition-all-200 ${currentSqlId === item.id ? 'bg-gray-800' : ''}`;
+        sqlItem.setAttribute('data-id', item.id);
+        
+        // 格式化SQL内容，只显示前几行
+        const formattedSql = item.content.split('\n').slice(0, 3).join('\n');
+        const showMore = item.content.split('\n').length > 3;
+        
+        // 渲染标签
+        const tagsHtml = item.tags && item.tags.length > 0 
+          ? item.tags.map(tag => `<span class="inline-block bg-gray-700 text-xs text-gray-300 px-2 py-0.5 rounded-md mr-1 mb-1">${tag}</span>`).join('')
+          : '';
+        
+        sqlItem.innerHTML = `
+          <div class="flex justify-between items-start">
+            <h3 class="font-medium text-light">${item.title}</h3>
+            <div class="text-xs text-gray-400">${formatDate(item.updatedAt)}</div>
+          </div>
+          <div class="mt-1 text-xs text-gray-400">${item.category}</div>
+          <div class="mt-2 text-sm font-mono text-gray-300 overflow-hidden">${formattedSql}${showMore ? '...' : ''}</div>
+          <div class="mt-2">${tagsHtml}</div>
+        `;
+        
+        sqlItem.addEventListener('click', () => {
+          openSql(item.id);
+        }).catch(function(error) {
+          showNotification('错误', 'Tabulator库加载失败: ' + error.message, 'error');
+        });
+        
+        sqlList.appendChild(sqlItem);
+      });
+    }
+    
+    // 渲染分类
+    function renderCategories() {
+      categoriesList.innerHTML = '';
+      
+      categories.forEach(category => {
+        const categoryItem = document.createElement('span');
+        categoryItem.className = `inline-block bg-gray-700 text-xs text-gray-300 px-2 py-0.5 rounded-md cursor-pointer hover:bg-gray-600 transition-all-200`;
+        categoryItem.textContent = category;
+        
+        categoryItem.addEventListener('click', () => {
+          categoryFilter.value = category;
+          filterSqlItems();
+        }).catch(function(error) {
+          showNotification('错误', 'Tabulator库加载失败: ' + error.message, 'error');
+        });
+        
+        categoriesList.appendChild(categoryItem);
+      });
+      
+      // 更新分类选择器
+      renderCategorySelectors();
+    }
+    
+    // 渲染标签
+    function renderTags() {
+      tagsList.innerHTML = '';
+      
+      tags.forEach(tag => {
+        const tagItem = document.createElement('span');
+        tagItem.className = `inline-block bg-gray-700 text-xs text-gray-300 px-2 py-0.5 rounded-md cursor-pointer hover:bg-gray-600 transition-all-200`;
+        tagItem.textContent = tag;
+        
+        tagItem.addEventListener('click', () => {
+          tagFilter.value = tag;
+          filterSqlItems();
+        }).catch(function(error) {
+          showNotification('错误', 'Tabulator库加载失败: ' + error.message, 'error');
+        });
+        
+        tagsList.appendChild(tagItem);
+      });
+      
+      // 更新标签选择器
+      renderTagFilter();
+    }
+    
+    // 渲染分类过滤器
+    function renderCategoryFilter() {
+      categoryFilter.innerHTML = '<option value="all">所有分类</option>';
+      
+      categories.forEach(category => {
+        const option = document.createElement('option');
+        option.value = category;
+        option.textContent = category;
+        categoryFilter.appendChild(option);
+      });
+    }
+    
+    // 渲染标签过滤器
+    function renderTagFilter() {
+      tagFilter.innerHTML = '<option value="all">所有标签</option>';
+      
+      tags.forEach(tag => {
+        const option = document.createElement('option');
+        option.value = tag;
+        option.textContent = tag;
+        tagFilter.appendChild(option);
+      });
+    }
+    
+    // 渲染分类选择器
+    function renderCategorySelectors() {
+      // 更新SQL编辑区的分类选择器
+      sqlCategory.innerHTML = '';
+      categories.forEach(category => {
+        const option = document.createElement('option');
+        option.value = category;
+        option.textContent = category;
+        sqlCategory.appendChild(option);
+      });
+      
+      // 更新新建SQL模态框的分类选择器
+      const newSqlCategory = document.getElementById('new-sql-category');
+      newSqlCategory.innerHTML = '';
+      categories.forEach(category => {
+        const option = document.createElement('option');
+        option.value = category;
+        option.textContent = category;
+        newSqlCategory.appendChild(option);
+      });
+    }
+    
+    // 渲染管理分类
+    function renderManageCategories() {
+      const manageCategoriesList = document.getElementById('manage-categories-list');
+      manageCategoriesList.innerHTML = '';
+      
+      categories.forEach(category => {
+        const categoryItem = document.createElement('div');
+        categoryItem.className = 'flex justify-between items-center bg-gray-800 border border-gray-700 rounded-md p-3';
+        
+        categoryItem.innerHTML = `
+          <span class="text-light">${category}</span>
+          <button class="delete-category-btn text-danger hover:text-red-400 transition-all-200" data-category="${category}">
+            <i class="fa fa-trash"></i>
+          </button>
+        `;
+        
+        manageCategoriesList.appendChild(categoryItem);
+      });
+      
+      // 添加删除分类事件
+      document.querySelectorAll('.delete-category-btn').forEach(button => {
+        button.addEventListener('click', (e) => {
+          const category = e.target.closest('.delete-category-btn').getAttribute('data-category');
+          deleteCategory(category);
+        }).catch(function(error) {
+          showNotification('错误', 'Tabulator库加载失败: ' + error.message, 'error');
+        });
+      });
+    }
+    
+    // 渲染管理标签
+    function renderManageTags() {
+      const manageTagsList = document.getElementById('manage-tags-list');
+      manageTagsList.innerHTML = '';
+      
+      tags.forEach(tag => {
+        const tagItem = document.createElement('span');
+        tagItem.className = 'bg-gray-800 border border-gray-700 rounded-md px-3 py-1 text-sm text-light flex items-center';
+        
+        tagItem.innerHTML = `
+          ${tag}
+          <button class="delete-tag-btn ml-2 text-danger hover:text-red-400 transition-all-200" data-tag="${tag}">
+            <i class="fa fa-times"></i>
+          </button>
+        `;
+        
+        manageTagsList.appendChild(tagItem);
+      });
+      
+      // 添加删除标签事件
+      document.querySelectorAll('.delete-tag-btn').forEach(button => {
+        button.addEventListener('click', (e) => {
+          const tag = e.target.closest('.delete-tag-btn').getAttribute('data-tag');
+          deleteTag(tag);
+        }).catch(function(error) {
+          showNotification('错误', 'Tabulator库加载失败: ' + error.message, 'error');
+        });
+      });
+    }
+    
+    // 渲染自定义模板
+    function renderCustomTemplates() {
+      const templateContainer = document.querySelector('#sql-template-modal .grid');
+      
+      // 清除现有的自定义模板
+      document.querySelectorAll('.custom-template-item').forEach(item => {
+        item.remove();
+      });
+      
+      // 添加自定义模板
+      customTemplates.forEach(template => {
+        const templateItem = document.createElement('div');
+        templateItem.className = 'bg-gray-800 border border-gray-700 rounded-md p-4 hover:border-primary cursor-pointer transition-all-200 template-item custom-template-item';
+        templateItem.setAttribute('data-id', template.id);
+        
+        // 格式化模板内容，只显示前几行
+        const formattedContent = template.content.split('\n').slice(0, 2).join('\n');
+        const showMore = template.content.split('\n').length > 2;
+        
+        templateItem.innerHTML = `
+          <div class="flex justify-between items-start">
+            <h3 class="font-medium text-light">${template.name}</h3>
+            <button class="delete-template-btn text-danger hover:text-red-400 transition-all-200" data-id="${template.id}">
+              <i class="fa fa-times"></i>
+            </button>
+          </div>
+          <pre class="text-sm text-gray-300 overflow-hidden mt-2">${formattedContent}${showMore ? '...' : ''}</pre>
+        `;
+        
+        templateContainer.appendChild(templateItem);
+      });
+      
+      // 添加删除模板事件
+      document.querySelectorAll('.delete-template-btn').forEach(button => {
+        button.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const templateId = button.getAttribute('data-id');
+          deleteCustomTemplate(templateId);
+        }).catch(function(error) {
+          showNotification('错误', 'Tabulator库加载失败: ' + error.message, 'error');
+        });
+      });
+    }
+    
+    // 创建新的SQL语句
+    function createNewSql() {
+      const title = document.getElementById('new-sql-title').value.trim();
+      const category = document.getElementById('new-sql-category').value;
+      const tagsInput = document.getElementById('new-sql-tags').value.trim();
+      
+      if (!title) {
+        showNotification('错误', '请输入SQL语句标题', 'error');
+        return;
+      }
+      
+      // 处理标签
+      let sqlTags = [];
+      if (tagsInput) {
+        sqlTags = tagsInput.split(',').map(tag => tag.trim()).filter(tag => tag);
+        
+        // 添加新标签到全局标签列表
+        sqlTags.forEach(tag => {
+          if (!tags.includes(tag)) {
+            tags.push(tag);
+          }
+        }).catch(function(error) {
+          showNotification('错误', 'Tabulator库加载失败: ' + error.message, 'error');
+        });
+      }
+      
+      // 创建新SQL对象
+      const newSql = {
+        id: generateId(),
+        title,
+        content: '',
+        category,
+        tags: sqlTags,
+        notes: '',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      
+      // 添加到列表
+      sqlItems.unshift(newSql);
+      
+      // 保存数据
+      saveData();
+      
+      // 更新UI
+      updateUI();
+      
+      // 打开新创建的SQL
+      openSql(newSql.id);
+      
+      // 关闭模态框
+      document.getElementById('new-sql-modal').classList.remove('show');
+      
+      // 清空表单
+      document.getElementById('new-sql-title').value = '';
+      document.getElementById('new-sql-tags').value = '';
+      
+      // 显示通知
+      showNotification('成功', 'SQL语句创建成功', 'success');
+    }
+    
+    // 打开SQL语句
+    function openSql(id) {
+      const sqlItem = sqlItems.find(item => item.id === id);
+      
+      if (!sqlItem) {
+        showNotification('错误', '未找到SQL语句', 'error');
+        return;
+      }
+      
+      // 更新当前SQL ID
+      currentSqlId = id;
+      
+      // 更新编辑器内容
+      sqlTitle.value = sqlItem.title;
+      sqlEditor.setValue(sqlItem.content);
+      sqlCategory.value = sqlItem.category || '未分类';
+      sqlNotes.value = sqlItem.notes || '';
+      
+      // 更新UI
+      updateUI();
+      
+      // 更新保存和删除按钮状态
+      const saveBtn = document.getElementById('save-sql-btn');
+      const deleteBtn = document.getElementById('delete-sql-btn');
+      
+      if (currentUser && sqlItem.createdBy && sqlItem.createdBy.id === currentUser.uid) {
+        saveBtn.disabled = false;
+        saveBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        deleteBtn.disabled = false;
+        deleteBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+      } else {
+        saveBtn.disabled = true;
+        saveBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        deleteBtn.disabled = true;
+        deleteBtn.classList.add('opacity-50', 'cursor-not-allowed');
+      }
+      
+      // 显示结果标签页
+      resultsTab.click();
+      
+      // 清除结果
+      clearResults();
+    }
+    
+    // 保存SQL语句
+    async function saveSql() {
+      // 检查用户是否登录
+      if (!currentUser) {
+        showNotification('提示', '请先登录', 'info');
+        document.getElementById('auth-modal').classList.add('show');
+        return;
+      }
+      
+      if (!currentSqlId) {
+        showNotification('提示', '请先创建或打开一个SQL语句', 'info');
+        return;
+      }
+      
+      const sqlItem = sqlItems.find(item => item.id === currentSqlId);
+      
+      if (!sqlItem) {
+        showNotification('错误', '未找到SQL语句', 'error');
+        return;
+      }
+      
+      // 检查权限
+      if (sqlItem.createdBy && sqlItem.createdBy.id !== currentUser.uid) {
+        showNotification('错误', '您没有权限修改此SQL语句', 'error');
+        return;
+      }
+      
+      // 更新SQL内容
+      const updatedSql = {
+        ...sqlItem,
+        title: sqlTitle.value.trim() || '未命名SQL',
+        content: sqlEditor.getValue(),
+        category: sqlCategory.value,
+        notes: sqlNotes.value,
+        updatedAt: new Date().toISOString()
+      };
+      
+      // 保存到Firebase
+      const success = await saveSqlToFirebase(updatedSql);
+      
+      if (success) {
+        // 更新本地数据
+        Object.assign(sqlItem, updatedSql);
+        
+        // 更新UI
+        updateUI();
+      }
+    }
+    
+    // 删除SQL语句
+    async function deleteSql() {
+      // 检查用户是否登录
+      if (!currentUser) {
+        showNotification('提示', '请先登录', 'info');
+        document.getElementById('auth-modal').classList.add('show');
+        return;
+      }
+      
+      if (!currentSqlId) {
+        showNotification('提示', '请先打开一个SQL语句', 'info');
+        return;
+      }
+      
+      const sqlItem = sqlItems.find(item => item.id === currentSqlId);
+      
+      if (!sqlItem) {
+        showNotification('错误', '未找到SQL语句', 'error');
+        return;
+      }
+      
+      // 检查权限
+      if (sqlItem.createdBy && sqlItem.createdBy.id !== currentUser.uid) {
+        showNotification('错误', '您没有权限删除此SQL语句', 'error');
+        return;
+      }
+      
+      if (confirm('确定要删除这条SQL语句吗？此操作不可撤销。')) {
+        // 从Firebase删除
+        const success = await deleteSqlFromFirebase(currentSqlId);
+        
+        if (success) {
+          // 从本地列表删除
+          const index = sqlItems.findIndex(item => item.id === currentSqlId);
+          if (index !== -1) {
+            sqlItems.splice(index, 1);
+          }
+          
+          // 更新UI
+          currentSqlId = null;
+          sqlTitle.value = '';
+          sqlEditor.setValue('');
+          sqlCategory.value = '未分类';
+          sqlNotes.value = '';
+          clearResults();
+          updateUI();
+        }
+      }
+    }
+    
+    // 执行SQL语句
+    function executeSql() {
+      if (!currentSqlId) {
+        showNotification('提示', '请先创建或打开一个SQL语句', 'info');
+        return;
+      }
+      
+      const sqlItem = sqlItems.find(item => item.id === currentSqlId);
+      
+      if (!sqlItem) {
+        showNotification('错误', '未找到SQL语句', 'error');
+        return;
+      }
+      
+      const sql = sqlEditor.getValue().trim();
+      
+      if (!sql) {
+        showNotification('提示', '请输入SQL语句', 'info');
+        return;
+      }
+      
+      // 检查数据库连接
+      if (!dbConnection) {
+        showNotification('提示', '请先连接到数据库', 'info');
+        document.getElementById('db-connection-btn').click();
+        return;
+      }
+      
+      // 检查是否有参数需要替换
+      const params = [];
+      const paramRegex = /{{\s*(\w+)\s*}}/g;
+      let match;
+      
+      while ((match = paramRegex.exec(sql)) !== null) {
+        if (!params.includes(match[1])) {
+          params.push(match[1]);
+        }
+      }
+      
+      // 如果有参数，提示用户输入
+      if (params.length > 0) {
+        const paramValues = {};
+        let allParamsEntered = true;
+        
+        for (const param of params) {
+          const value = prompt(`请输入参数值: ${param}`);
+          
+          if (value === null) {
+            allParamsEntered = false;
+            break;
+          }
+          
+          paramValues[param] = value;
+        }
+        
+        if (!allParamsEntered) {
+          return;
+        }
+        
+        // 替换参数
+        let sqlWithParams = sql;
+        for (const [param, value] of Object.entries(paramValues)) {
+          sqlWithParams = sqlWithParams.replace(new RegExp(`{{\\s*${param}\\s*}}`, 'g'), value);
+        }
+        
+        // 执行带参数的SQL
+        executeSqlWithParams(sqlWithParams);
+      } else {
+        // 直接执行SQL
+        executeSqlWithParams(sql);
+      }
+    }
+    
+    // 执行带参数的SQL
+    function executeSqlWithParams(sql) {
+      // 显示执行状态
+      executionStatus.innerHTML = '<i class="fa fa-spinner fa-spin mr-1"></i>执行中...';
+      executionStatus.className = 'text-sm text-warning';
+      
+      // 模拟执行延迟
+      setTimeout(() => {
+        try {
+          // 模拟执行结果
+          const result = simulateSqlExecution(sql);
+          
+          // 显示结果
+          displayResults(result);
+          
+          // 更新执行状态
+          executionStatus.innerHTML = `<i class="fa fa-check-circle mr-1"></i>执行成功 (${result.rows.length} 行)`;
+          executionStatus.className = 'text-sm text-secondary';
+          
+          // 显示通知
+          showNotification('成功', 'SQL语句执行成功', 'success');
+        } catch (error) {
+          // 显示错误
+          displayError(error.message);
+          
+          // 更新执行状态
+          executionStatus.innerHTML = `<i class="fa fa-exclamation-circle mr-1"></i>执行失败`;
+          executionStatus.className = 'text-sm text-danger';
+          
+          // 显示通知
+          showNotification('错误', error.message, 'error');
+        }
+      }, 1000);
+    }
+    
+    // 模拟SQL执行
+    function simulateSqlExecution(sql) {
+      // 简单的SQL解析和模拟执行
+      const lowerSql = sql.toLowerCase();
+      
+      // 模拟错误
+      if (lowerSql.includes('error')) {
+        throw new Error('模拟错误: SQL语句包含"error"关键词');
+      }
+      
+      // 模拟SELECT语句
+      if (lowerSql.startsWith('select')) {
+        // 模拟结果数据
+        const columns = ['id', 'name', 'email', 'created_at'];
+        const rows = [];
+        
+        // 生成随机数据
+        for (let i = 1; i <= 10; i++) {
+          rows.push({
+            id: i,
+            name: `User ${i}`,
+            email: `user${i}@example.com`,
+            created_at: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString()
+          }).catch(function(error) {
+          showNotification('错误', 'Tabulator库加载失败: ' + error.message, 'error');
+        });
+        }
+        
+        return {
+          columns,
+          rows,
+          affectedRows: 0
+        };
+      }
+      
+      // 模拟INSERT语句
+      if (lowerSql.startsWith('insert')) {
+        return {
+          columns: [],
+          rows: [],
+          affectedRows: 1
+        };
+      }
+      
+      // 模拟UPDATE语句
+      if (lowerSql.startsWith('update')) {
+        return {
+          columns: [],
+          rows: [],
+          affectedRows: Math.floor(Math.random() * 10) + 1
+        };
+      }
+      
+      // 模拟DELETE语句
+      if (lowerSql.startsWith('delete')) {
+        return {
+          columns: [],
+          rows: [],
+          affectedRows: Math.floor(Math.random() * 5) + 1
+        };
+      }
+      
+      // 模拟其他语句
+      return {
+        columns: [],
+        rows: [],
+        affectedRows: 0
+      };
+    }
+    
+    // 显示执行结果
+    function displayResults(result) {
+      // 清除之前的结果
+      clearResults();
+      
+      // 隐藏无结果消息
+      noResultsMessage.classList.add('hidden');
+      
+      // 显示结果容器
+      sqlResults.classList.remove('hidden');
+      
+      // 如果有行数据，显示表格
+      if (result.rows && result.rows.length > 0) {
+        // 创建表格
+        const table = document.createElement('div');
+        table.id = 'result-table';
+        sqlResults.appendChild(table);
+        
+        // 使用Tabulator创建表格
+        window.tabulatorPromise.then(function(Tabulator) {
+          new Tabulator('#result-table', {
+            data: result.rows,
+            columns: Object.keys(result.rows[0]).map(key => ({
+              title: key,
+              field: key,
+              sorter: 'string',
+              headerFilter: 'input'
+            })),
+            pagination: 'local',
+            paginationSize: 10,
+            paginationSizeSelector: [5, 10, 20, 50],
+            layout: 'fitColumns',
+            responsiveLayout: 'collapse',
+            resizableColumns: true,
+            tooltips: true,
+            tooltipGenerationMode: 'hover'
+          });
+        }).catch(function(error) {
+          showNotification('错误', 'Tabulator库加载失败: ' + error.message, 'error');
+        });
+      } else {
+        // 显示影响行数
+        const message = document.createElement('div');
+        message.className = 'text-center text-gray-300 p-4';
+        message.innerHTML = `<i class="fa fa-info-circle text-info mr-1"></i>语句执行成功，影响了 ${result.affectedRows} 行`;
+        sqlResults.appendChild(message);
+      }
+    }
+    
+    // 显示错误
+    function displayError(message) {
+      // 清除之前的结果
+      clearResults();
+      
+      // 隐藏无结果消息
+      noResultsMessage.classList.add('hidden');
+      
+      // 显示结果容器
+      sqlResults.classList.remove('hidden');
+      
+      // 创建错误消息
+      const errorElement = document.createElement('div');
+      errorElement.className = 'bg-red-900 bg-opacity-20 border border-red-700 rounded-md p-4 text-danger';
+      errorElement.innerHTML = `
+        <div class="flex items-start">
+          <i class="fa fa-exclamation-triangle mr-3 mt-0.5"></i>
+          <div>
+            <h4 class="font-medium">执行错误</h4>
+            <p class="text-sm mt-1">${message}</p>
+          </div>
+        </div>
+      `;
+      
+      sqlResults.appendChild(errorElement);
+    }
+    
+    // 清除结果
+    function clearResults() {
+      sqlResults.innerHTML = '';
+      noResultsMessage.classList.remove('hidden');
+      sqlResults.classList.add('hidden');
+      executionStatus.innerHTML = '就绪';
+      executionStatus.className = 'text-sm text-gray-400';
+    }
+    
+    // 格式化SQL
+    function formatSql() {
+      const sql = sqlEditor.getValue();
+      
+      if (!sql) {
+        showNotification('提示', '请先输入SQL语句', 'info');
+        return;
+      }
+      
+      try {
+        // 简单的SQL格式化
+        const formattedSql = formatSqlString(sql);
+        sqlEditor.setValue(formattedSql);
+        
+        showNotification('成功', 'SQL语句格式化成功', 'success');
+      } catch (error) {
+        showNotification('错误', 'SQL语句格式化失败: ' + error.message, 'error');
+      }
+    }
+    
+    // 简单的SQL格式化函数
+    function formatSqlString(sql) {
+      // 这是一个简单的SQL格式化实现
+      // 在实际应用中，你可能需要使用更复杂的库来处理各种SQL语法
+      
+      let formatted = sql;
+      
+      // 关键字大写
+      const keywords = ['SELECT', 'FROM', 'WHERE', 'AND', 'OR', 'JOIN', 'ON', 'IN', 'NOT', 'NULL', 'LIKE', 'ORDER', 'BY', 'GROUP', 'HAVING', 'LIMIT', 'OFFSET', 'INSERT', 'INTO', 'VALUES', 'UPDATE', 'SET', 'DELETE', 'CREATE', 'TABLE', 'ALTER', 'DROP', 'ADD', 'CONSTRAINT', 'PRIMARY', 'KEY', 'FOREIGN', 'REFERENCES', 'DEFAULT', 'NOT', 'NULL', 'UNIQUE', 'INDEX', 'ASC', 'DESC'];
+      
+      keywords.forEach(keyword => {
+        const regex = new RegExp(`\\b${keyword.toLowerCase()}\\b`, 'gi');
+        formatted = formatted.replace(regex, keyword);
+      });
+      
+      // 添加换行
+      formatted = formatted.replace(/SELECT/g, '\nSELECT');
+      formatted = formatted.replace(/FROM/g, '\nFROM');
+      formatted = formatted.replace(/WHERE/g, '\nWHERE');
+      formatted = formatted.replace(/JOIN/g, '\nJOIN');
+      formatted = formatted.replace(/AND/g, '\n  AND');
+      formatted = formatted.replace(/OR/g, '\n  OR');
+      formatted = formatted.replace(/GROUP BY/g, '\nGROUP BY');
+      formatted = formatted.replace(/HAVING/g, '\nHAVING');
+      formatted = formatted.replace(/ORDER BY/g, '\nORDER BY');
+      formatted = formatted.replace(/LIMIT/g, '\nLIMIT');
+      
+      // 缩进
+      let lines = formatted.split('\n');
+      let indentLevel = 0;
+      const indentSize = 2;
+      
+      for (let i = 0; i < lines.length; i++) {
+        let line = lines[i].trim();
+        
+        if (line.startsWith(')')) {
+          indentLevel--;
+        }
+        
+        const indent = ' '.repeat(indentLevel * indentSize);
+        lines[i] = indent + line;
+        
+        if (line.endsWith('(') && !line.startsWith(')')) {
+          indentLevel++;
+        }
+      }
+      
+      formatted = lines.join('\n');
+      
+      // 移除多余空行
+      formatted = formatted.replace(/\n+/g, '\n').replace(/^\n/, '');
+      
+      return formatted;
+    }
+    
+    // 插入模板
+    function insertTemplate(templateType) {
+      let template = '';
+      
+      switch (templateType) {
+        case 'select':
+          template = `SELECT column1, column2
+FROM table_name
+WHERE condition
+LIMIT 10;`;
+          break;
+        case 'insert':
+          template = `INSERT INTO table_name (column1, column2, column3)
+VALUES (value1, value2, value3);`;
+          break;
+        case 'update':
+          template = `UPDATE table_name
+SET column1 = value1, column2 = value2
+WHERE condition;`;
+          break;
+        case 'delete':
+          template = `DELETE FROM table_name
+WHERE condition;`;
+          break;
+        case 'join':
+          template = `SELECT t1.column1, t2.column2
+FROM table1 t1
+JOIN table2 t2 ON t1.id = t2.table1_id
+WHERE condition;`;
+          break;
+        case 'cte':
+          template = `WITH cte_name AS (
+  SELECT column1, column2
+  FROM table_name
+  WHERE condition
+)
+SELECT *
+FROM cte_name;`;
+          break;
+      }
+      
+      sqlEditor.setValue(template);
+    }
+    
+    // 保存自定义模板
+    function saveCustomTemplate() {
+      const templateName = document.getElementById('custom-template-name').value.trim();
+      const templateContent = document.getElementById('custom-template-content').value.trim();
+      
+      if (!templateName) {
+        showNotification('错误', '请输入模板名称', 'error');
+        return;
+      }
+      
+      if (!templateContent) {
+        showNotification('错误', '请输入模板内容', 'error');
+        return;
+      }
+      
+      // 创建新模板
+      const newTemplate = {
+        id: generateId(),
+        name: templateName,
+        content: templateContent,
+        createdAt: new Date().toISOString()
+      };
+      
+      // 添加到模板列表
+      customTemplates.push(newTemplate);
+      
+      // 保存数据
+      saveData();
+      
+      // 更新UI
+      renderCustomTemplates();
+      
+      // 清空表单
+      document.getElementById('custom-template-name').value = '';
+      document.getElementById('custom-template-content').value = '';
+      
+      // 显示通知
+      showNotification('成功', '自定义模板保存成功', 'success');
+    }
+    
+    // 删除自定义模板
+    function deleteCustomTemplate(templateId) {
+      const index = customTemplates.findIndex(template => template.id === templateId);
+      
+      if (index !== -1) {
+        customTemplates.splice(index, 1);
+        
+        // 保存数据
+        saveData();
+        
+        // 更新UI
+        renderCustomTemplates();
+        
+        // 显示通知
+        showNotification('成功', '自定义模板已删除', 'success');
+      }
+    }
+    
+    // 添加标签到当前SQL
+    async function addTagToSql() {
+      // 检查用户是否登录
+      if (!currentUser) {
+        showNotification('提示', '请先登录', 'info');
+        document.getElementById('auth-modal').classList.add('show');
+        return;
+      }
+      
+      if (!currentSqlId) {
+        showNotification('提示', '请先创建或打开一个SQL语句', 'info');
+        return;
+      }
+      
+      const tagInput = document.getElementById('add-tag-input');
+      const tag = tagInput.value.trim();
+      
+      if (!tag) {
+        return;
+      }
+      
+      const sqlItem = sqlItems.find(item => item.id === currentSqlId);
+      
+      if (!sqlItem) {
+        showNotification('错误', '未找到SQL语句', 'error');
+        return;
+      }
+      
+      // 检查权限
+      if (sqlItem.createdBy && sqlItem.createdBy.id !== currentUser.uid) {
+        showNotification('错误', '您没有权限修改此SQL语句', 'error');
+        return;
+      }
+      
+      // 初始化标签数组
+      if (!sqlItem.tags) {
+        sqlItem.tags = [];
+      }
+      
+      // 检查标签是否已存在
+      if (sqlItem.tags.includes(tag)) {
+        showNotification('提示', '标签已存在', 'info');
+        tagInput.value = '';
+        return;
+      }
+      
+      // 添加标签到Firebase
+      if (!tags.includes(tag)) {
+        await addTagToFirebase(tag);
+      }
+      
+      // 添加标签到SQL语句
+      sqlItem.tags.push(tag);
+      
+      // 保存到Firebase
+      await saveSqlToFirebase(sqlItem);
+      
+      // 更新UI
+      updateUI();
+      
+      // 清空输入框
+      tagInput.value = '';
+    }
+    
+    // 添加新分类
+    async function addNewCategory() {
+      // 检查用户是否登录
+      if (!currentUser) {
+        showNotification('提示', '请先登录', 'info');
+        document.getElementById('auth-modal').classList.add('show');
+        return;
+      }
+      
+      const category = prompt('请输入新分类名称:');
+      
+      if (!category || category.trim() === '') {
+        return;
+      }
+      
+      const trimmedCategory = category.trim();
+      
+      if (categories.includes(trimmedCategory)) {
+        showNotification('提示', '分类已存在', 'info');
+        return;
+      }
+      
+      // 添加到Firebase
+      await addCategoryToFirebase(trimmedCategory);
+    }
+    
+    // 添加新标签
+    async function addNewTag() {
+      // 检查用户是否登录
+      if (!currentUser) {
+        showNotification('提示', '请先登录', 'info');
+        document.getElementById('auth-modal').classList.add('show');
+        return;
+      }
+      
+      const tag = prompt('请输入新标签名称:');
+      
+      if (!tag || tag.trim() === '') {
+        return;
+      }
+      
+      const trimmedTag = tag.trim();
+      
+      if (tags.includes(trimmedTag)) {
+        showNotification('提示', '标签已存在', 'info');
+        return;
+      }
+      
+      // 添加到Firebase
+      await addTagToFirebase(trimmedTag);
+    }
+    
+    // 删除分类
+    function deleteCategory(category) {
+      if (category === '未分类') {
+        showNotification('错误', '不能删除"未分类"', 'error');
+        return;
+      }
+      
+      if (confirm(`确定要删除分类"${category}"吗？相关SQL语句将被设为"未分类"。`)) {
+        const index = categories.indexOf(category);
+        
+        if (index !== -1) {
+          categories.splice(index, 1);
+          
+          // 更新使用此分类的SQL语句
+          sqlItems.forEach(sql => {
+            if (sql.category === category) {
+              sql.category = '未分类';
+            }
+          }).catch(function(error) {
+          showNotification('错误', 'Tabulator库加载失败: ' + error.message, 'error');
+        });
+          
+          // 保存数据
+          saveData();
+          
+          // 更新UI
+          updateUI();
+          
+          // 显示通知
+          showNotification('成功', `分类"${category}"已删除`, 'success');
+        }
+      }
+    }
+    
+    // 删除标签
+    function deleteTag(tag) {
+      if (confirm(`确定要删除标签"${tag}"吗？相关SQL语句中的此标签也将被移除。`)) {
+        const index = tags.indexOf(tag);
+        
+        if (index !== -1) {
+          tags.splice(index, 1);
+          
+          // 从所有SQL语句中移除此标签
+          sqlItems.forEach(sql => {
+            if (sql.tags && sql.tags.includes(tag)) {
+              sql.tags = sql.tags.filter(t => t !== tag);
+            }
+          }).catch(function(error) {
+          showNotification('错误', 'Tabulator库加载失败: ' + error.message, 'error');
+        });
+          
+          // 保存数据
+          saveData();
+          
+          // 更新UI
+          updateUI();
+          
+          // 显示通知
+          showNotification('成功', `标签"${tag}"已删除`, 'success');
+        }
+      }
+    }
+    
+    // 过滤SQL列表
+    function filterSqlItems() {
+      const searchTerm = sqlSearch.value.toLowerCase();
+      const category = categoryFilter.value;
+      const tag = tagFilter.value;
+      
+      let filteredItems = sqlItems;
+      
+      // 按搜索词过滤
+      if (searchTerm) {
+        filteredItems = filteredItems.filter(item => 
+          item.title.toLowerCase().includes(searchTerm) || 
+          item.content.toLowerCase().includes(searchTerm) || 
+          (item.notes && item.notes.toLowerCase().includes(searchTerm))
+        );
+      }
+      
+      // 按分类过滤
+      if (category !== 'all') {
+        filteredItems = filteredItems.filter(item => item.category === category);
+      }
+      
+      // 按标签过滤
+      if (tag !== 'all') {
+        filteredItems = filteredItems.filter(item => 
+          item.tags && item.tags.includes(tag)
+        );
+      }
+      
+      // 更新列表
+      renderSqlList(filteredItems);
+    }
+    
+    // 导出结果
+    function exportResults() {
+      const exportFormat = document.getElementById('export-format').value;
+      const resultTable = document.querySelector('#result-table');
+      
+      if (!resultTable) {
+        showNotification('提示', '没有可导出的结果', 'info');
+        return;
+      }
+      
+      // 获取Tabulator实例
+      window.tabulatorPromise.then(function(Tabulator) {
+        const table = Tabulator.findTable(resultTable)[0];
+      
+      if (!table) {
+        showNotification('错误', '无法获取结果数据', 'error');
+        return;
+      }
+      
+        // 获取所有数据
+        const data = table.getData();
+      
+      if (!data || data.length === 0) {
+        showNotification('提示', '没有可导出的结果', 'info');
+        return;
+      }
+      
+      let csvContent = '';
+      let fileName = '';
+      
+      switch (exportFormat) {
+        case 'csv':
+          // 生成CSV
+          const headers = Object.keys(data[0]).join(',');
+          const rows = data.map(row => 
+            Object.values(row).map(value => {
+              // 处理包含逗号或引号的值
+              if (value === null || value === undefined) {
+                return '';
+              }
+              
+              const strValue = String(value);
+              if (strValue.includes(',') || strValue.includes('"') || strValue.includes('\n')) {
+                return `"${strValue.replace(/"/g, '""')}"`;
+              }
+              return strValue;
+            }).join(',')
+          );
+          
+          csvContent = [headers, ...rows].join('\n');
+          fileName = 'sql_results.csv';
+          
+          // 创建下载链接
+          const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.setAttribute('href', url);
+          link.setAttribute('download', fileName);
+          link.style.visibility = 'hidden';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          break;
+          
+        case 'json':
+          // 生成JSON
+          const jsonContent = JSON.stringify(data, null, 2);
+          fileName = 'sql_results.json';
+          
+          // 创建下载链接
+          const jsonBlob = new Blob([jsonContent], { type: 'application/json;charset=utf-8;' });
+          const jsonUrl = URL.createObjectURL(jsonBlob);
+          const jsonLink = document.createElement('a');
+          jsonLink.setAttribute('href', jsonUrl);
+          jsonLink.setAttribute('download', fileName);
+          jsonLink.style.visibility = 'hidden';
+          document.body.appendChild(jsonLink);
+          jsonLink.click();
+          document.body.removeChild(jsonLink);
+          break;
+          
+        case 'excel':
+          // 模拟Excel导出（实际上是CSV，但文件扩展名为.xls）
+          const excelHeaders = Object.keys(data[0]).join('\t');
+          const excelRows = data.map(row => 
+            Object.values(row).map(value => {
+              if (value === null || value === undefined) {
+                return '';
+              }
+              return String(value).replace(/\t/g, ' ');
+            }).join('\t')
+          );
+          
+          csvContent = [excelHeaders, ...excelRows].join('\n');
+          fileName = 'sql_results.xls';
+          
+          // 创建下载链接
+          const excelBlob = new Blob([csvContent], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+          const excelUrl = URL.createObjectURL(excelBlob);
+          const excelLink = document.createElement('a');
+          excelLink.setAttribute('href', excelUrl);
+          excelLink.setAttribute('download', fileName);
+          excelLink.style.visibility = 'hidden';
+          document.body.appendChild(excelLink);
+          excelLink.click();
+          document.body.removeChild(excelLink);
+          break;
+      }
+      
+        showNotification('成功', `结果已导出为 ${fileName}`, 'success');
+      }).catch(function(error) {
+        showNotification('错误', 'Tabulator库加载失败: ' + error.message, 'error');
+      });
+    }
+    
+    // 测试数据库连接
+    function testDbConnection() {
+      const dbType = document.getElementById('db-type').value;
+      const dbHost = document.getElementById('db-host').value;
+      const dbPort = document.getElementById('db-port').value;
+      const dbName = document.getElementById('db-name').value;
+      const dbUser = document.getElementById('db-user').value;
+      const dbPassword = document.getElementById('db-password').value;
+      
+      if (!dbName) {
+        showNotification('错误', '请输入数据库名', 'error');
+        return;
+      }
+      
+      // 显示测试状态
+      const testBtn = document.getElementById('test-connection-btn');
+      const originalText = testBtn.innerHTML;
+      testBtn.innerHTML = '<i class="fa fa-spinner fa-spin mr-1"></i>测试中...';
+      testBtn.disabled = true;
+      
+      // 模拟连接测试
+      setTimeout(() => {
+        try {
+          // 模拟连接成功
+          showNotification('成功', '数据库连接测试成功', 'success');
+        } catch (error) {
+          showNotification('错误', '数据库连接测试失败: ' + error.message, 'error');
+        } finally {
+          // 恢复按钮状态
+          testBtn.innerHTML = originalText;
+          testBtn.disabled = false;
+        }
+      }, 1500);
+    }
+    
+    // 保存数据库连接
+    function saveDbConnection() {
+      const dbType = document.getElementById('db-type').value;
+      const dbHost = document.getElementById('db-host').value;
+      const dbPort = document.getElementById('db-port').value;
+      const dbName = document.getElementById('db-name').value;
+      const dbUser = document.getElementById('db-user').value;
+      const dbPassword = document.getElementById('db-password').value;
+      
+      if (!dbName) {
+        showNotification('错误', '请输入数据库名', 'error');
+        return;
+      }
+      
+      // 创建连接对象
+      dbConnection = {
+        type: dbType,
+        host: dbHost,
+        port: dbPort,
+        name: dbName,
+        user: dbUser,
+        password: dbPassword
+      };
+      
+      // 保存数据
+      saveData();
+      
+      // 更新UI
+      document.getElementById('current-db').textContent = `${dbType} - ${dbName}`;
+      document.getElementById('db-connection-dropdown').classList.add('hidden');
+      
+      // 显示通知
+      showNotification('成功', '数据库连接已保存', 'success');
+    }
+    
+    // 显示通知
+    function showNotification(title, message, type = 'info') {
+      notificationTitle.textContent = title;
+      notificationMessage.textContent = message;
+      
+      // 设置通知类型
+      notification.className = 'notification';
+      notification.classList.add(type);
+      
+      // 设置图标
+      switch (type) {
+        case 'success':
+          notificationIcon.className = 'fa fa-check-circle text-secondary mr-3 mt-0.5';
+          break;
+        case 'error':
+          notificationIcon.className = 'fa fa-exclamation-circle text-danger mr-3 mt-0.5';
+          break;
+        case 'info':
+          notificationIcon.className = 'fa fa-info-circle text-info mr-3 mt-0.5';
+          break;
+      }
+      
+      // 显示通知
+      notification.classList.add('show');
+      
+      // 自动关闭
+      setTimeout(() => {
+        notification.classList.remove('show');
+      }, 5000);
+    }
+    
+    // 生成唯一ID
+    function generateId() {
+      return Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+    }
+    
+    // 格式化日期
+    function formatDate(dateString) {
+      const date = new Date(dateString);
+      return date.toLocaleString();
+    }
+    
+    // 初始化Firebase认证监听
+    function initAuthListeners() {
+      // 监听用户认证状态变化
+      auth.onAuthStateChanged((user) => {
+        currentUser = user;
+        
+        if (user) {
+          // 用户已登录
+          updateUserUI();
+          loadData();
+        } else {
+          // 用户未登录
+          resetUserUI();
+          stopLoadingFromFirebase();
+          showAuthModal();
+        }
+      });
+    }
+    
+    // 初始化登录/注册表单事件
+    function initAuthFormListeners() {
+      // 登录表单提交
+      document.getElementById('login-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const email = document.getElementById('login-email').value;
+        const password = document.getElementById('login-password').value;
+        
+        try {
+          await auth.signInWithEmailAndPassword(email, password);
+          document.getElementById('auth-modal').classList.remove('show');
+        } catch (error) {
+          showNotification('错误', '登录失败: ' + error.message, 'error');
+        }
+      });
+      
+      // 注册表单提交
+      document.getElementById('register-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const email = document.getElementById('register-email').value;
+        const password = document.getElementById('register-password').value;
+        const displayName = document.getElementById('register-name').value;
+        
+        try {
+          const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+          
+          // 更新用户显示名称
+          await userCredential.user.updateProfile({
+            displayName: displayName
+          });
+          
+          document.getElementById('auth-modal').classList.remove('show');
+        } catch (error) {
+          showNotification('错误', '注册失败: ' + error.message, 'error');
+        }
+      });
+      
+      // 切换登录/注册表单
+      document.getElementById('show-register-form').addEventListener('click', () => {
+        document.getElementById('login-form-container').classList.add('hidden');
+        document.getElementById('register-form-container').classList.remove('hidden');
+      });
+      
+      document.getElementById('show-login-form').addEventListener('click', () => {
+        document.getElementById('register-form-container').classList.add('hidden');
+        document.getElementById('login-form-container').classList.remove('hidden');
+      });
+      
+      // 忘记密码
+      document.getElementById('forgot-password').addEventListener('click', async () => {
+        const email = document.getElementById('login-email').value;
+        
+        if (!email) {
+          showNotification('提示', '请先输入邮箱地址', 'info');
+          return;
+        }
+        
+        try {
+          await auth.sendPasswordResetEmail(email);
+          showNotification('成功', '密码重置邮件已发送', 'success');
+        } catch (error) {
+          showNotification('错误', '发送重置邮件失败: ' + error.message, 'error');
+        }
+      });
+      
+      // 使用Google登录
+      document.getElementById('google-login').addEventListener('click', async () => {
+        try {
+          const provider = new firebase.auth.GoogleAuthProvider();
+          await auth.signInWithPopup(provider);
+          document.getElementById('auth-modal').classList.remove('show');
+        } catch (error) {
+          showNotification('错误', 'Google登录失败: ' + error.message, 'error');
+        }
+      });
+      
+      // 使用GitHub登录
+      document.getElementById('github-login').addEventListener('click', async () => {
+        try {
+          const provider = new firebase.auth.GithubAuthProvider();
+          await auth.signInWithPopup(provider);
+          document.getElementById('auth-modal').classList.remove('show');
+        } catch (error) {
+          showNotification('错误', 'GitHub登录失败: ' + error.message, 'error');
+        }
+      });
+    }
+    
+    // 初始化协作功能事件
+    function initCollaborationListeners() {
+      // 分享按钮点击事件
+      document.getElementById('share-sql-btn').addEventListener('click', () => {
+        if (!currentSqlId) {
+          showNotification('提示', '请先打开一个SQL语句', 'info');
+          return;
+        }
+        
+        const sqlItem = sqlItems.find(item => item.id === currentSqlId);
+        
+        if (!sqlItem) {
+          showNotification('错误', '未找到SQL语句', 'error');
+          return;
+        }
+        
+        // 生成分享链接
+        const shareUrl = `${window.location.origin}${window.location.pathname}?sql=${sqlItem.id}`;
+        
+        // 复制到剪贴板
+        navigator.clipboard.writeText(shareUrl)
+          .then(() => {
+            showNotification('成功', '分享链接已复制到剪贴板', 'success');
+          })
+          .catch(() => {
+            // 显示分享链接
+            document.getElementById('share-link').value = shareUrl;
+            document.getElementById('share-modal').classList.add('show');
+          });
+      });
+      
+      // 复制分享链接按钮
+      document.getElementById('copy-share-link').addEventListener('click', () => {
+        const shareLink = document.getElementById('share-link');
+        shareLink.select();
+        document.execCommand('copy');
+        showNotification('成功', '分享链接已复制到剪贴板', 'success');
+        document.getElementById('share-modal').classList.remove('show');
+      });
+      
+      // 评论提交
+      document.getElementById('comment-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        if (!currentSqlId) {
+          showNotification('提示', '请先打开一个SQL语句', 'info');
+          return;
+        }
+        
+        const commentText = document.getElementById('comment-text').value.trim();
+        
+        if (!commentText) {
+          showNotification('提示', '请输入评论内容', 'info');
+          return;
+        }
+        
+        try {
+          // 添加评论到Firebase
+          await db.collection('sqlSnippets').doc(currentSqlId).collection('comments').add({
+            text: commentText,
+            createdBy: {
+              id: currentUser.uid,
+              displayName: currentUser.displayName || currentUser.email,
+              photoURL: currentUser.photoURL
+            },
+            createdAt: new Date().toISOString()
+          });
+          
+          // 清空评论输入框
+          document.getElementById('comment-text').value = '';
+          
+          // 显示评论标签页
+          document.getElementById('comments-tab').click();
+          
+          showNotification('成功', '评论已添加', 'success');
+        } catch (error) {
+          console.error('Error adding comment:', error);
+          showNotification('错误', '添加评论失败: ' + error.message, 'error');
+        }
+      });
+    }
+    
+    // 更新用户UI
+    function updateUserUI() {
+      // 更新用户菜单
+      const userMenu = document.getElementById('user-menu');
+      const userDropdown = document.getElementById('user-dropdown');
+      
+      if (currentUser) {
+        userMenu.innerHTML = `
+          <div class="flex items-center">
+            <img src="${currentUser.photoURL || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(currentUser.displayName || currentUser.email)}" alt="User Avatar" class="w-8 h-8 rounded-full mr-2">
+            <span class="text-white">${currentUser.displayName || currentUser.email}</span>
+            <i class="fa fa-chevron-down ml-2 text-gray-400"></i>
+          </div>
+        `;
+        
+        // 显示用户菜单
+        userMenu.classList.remove('hidden');
+        
+        // 更新下拉菜单事件
+        userMenu.addEventListener('click', () => {
+          userDropdown.classList.toggle('hidden');
+        });
+      } else {
+        // 隐藏用户菜单
+        userMenu.classList.add('hidden');
+      }
+      
+      // 更新新建SQL按钮状态
+      const newSqlBtn = document.getElementById('new-sql-btn');
+      
+      if (currentUser) {
+        newSqlBtn.disabled = false;
+        newSqlBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+      } else {
+        newSqlBtn.disabled = true;
+        newSqlBtn.classList.add('opacity-50', 'cursor-not-allowed');
+      }
+    }
+    
+    // 重置用户UI
+    function resetUserUI() {
+      // 清空SQL列表
+      sqlItems = [];
+      categories = ['未分类'];
+      tags = [];
+      
+      // 清空编辑器
+      currentSqlId = null;
+      sqlTitle.value = '';
+      sqlEditor.setValue('');
+      sqlCategory.value = '未分类';
+      sqlNotes.value = '';
+      clearResults();
+      
+      // 更新UI
+      updateUI();
+    }
+    
+    // 显示认证模态框
+    function showAuthModal() {
+      document.getElementById('auth-modal').classList.add('show');
+    }
+    
+    // 显示加载状态
+    function showLoading(message) {
+      const loadingModal = document.getElementById('loading-modal');
+      const loadingMessage = document.getElementById('loading-message');
+      
+      loadingMessage.textContent = message || '加载中...';
+      loadingModal.classList.add('show');
+    }
+    
+    // 隐藏加载状态
+    function hideLoading() {
+      const loadingModal = document.getElementById('loading-modal');
+      loadingModal.classList.remove('show');
+    }
+    
+    // 页面加载完成后初始化
+    document.addEventListener('DOMContentLoaded', initialize);
+    
+    // 检查URL参数是否有SQL语句ID
+    function checkUrlParams() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const sqlId = urlParams.get('sql');
+      
+      if (sqlId) {
+        // 等待数据加载完成后打开SQL语句
+        const checkDataLoaded = setInterval(() => {
+          if (sqlItems.length > 0) {
+            clearInterval(checkDataLoaded);
+            openSql(sqlId);
+          }
+        }, 100);
+      }
+    }
+  </script>
+</body>
+</html>

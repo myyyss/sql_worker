@@ -1,0 +1,15 @@
+# 极简版本依赖包列表
+# 仅包含标准库和最基础的第三方库
+
+# 这些都是Python标准库，不需要安装
+# sqlite3 - 已包含在Python标准库中
+# http.server - 已包含在Python标准库中
+# json - 已包含在Python标准库中
+# uuid - 已包含在Python标准库中
+# hashlib - 已包含在Python标准库中
+# datetime - 已包含在Python标准库中
+# urllib - 已包含在Python标准库中
+# base64 - 已包含在Python标准库中
+
+# 仅需要这一个第三方库
+PyJWT==2.0.1

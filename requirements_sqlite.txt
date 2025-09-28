@@ -1,0 +1,14 @@
+# SQLite版本依赖包列表
+# 不依赖pyodbc，使用SQLite数据库
+
+# 后端依赖 - 指定兼容版本
+Flask==2.0.3
+Flask-CORS==3.0.10
+Flask-SQLAlchemy==2.5.3
+PyJWT==2.3.0
+Werkzeug==2.0.3
+SQLAlchemy==1.4.46
+
+# 开发工具
+pytest==7.3.1
+pytest-flask==1.2.0

@@ -1,0 +1,68 @@
+{
+  "timestamp": "2025-09-28T22:45:38.634383",
+  "system": {
+    "os": "Windows",
+    "os_version": "10.0.19045",
+    "python_version": "3.13.0",
+    "platform": "Windows-10-10.0.19045-SP0"
+  },
+  "network_tests": true,
+  "git_config": {
+    "user.name": "myysss",
+    "user.email": "314298443@qq.com",
+    "remote.origin.url": null,
+    "http.proxy": null,
+    "https.proxy": null,
+    "core.proxy": null
+  },
+  "remote_repository": {
+    "type": null,
+    "url": null,
+    "status": "error"
+  },
+  "git_tests": [
+    [
+      "Git版本",
+      "成功"
+    ],
+    [
+      "Git配置检查",
+      "成功"
+    ],
+    [
+      "Git远程仓库信息",
+      "失败"
+    ],
+    [
+      "Git fetch测试",
+      "失败"
+    ]
+  ],
+  "solutions": [
+    {
+      "priority": "低",
+      "title": "尝试使用代理",
+      "steps": [
+        "如果您在企业网络中，可能需要配置代理",
+        "联系网络管理员获取代理设置"
+      ]
+    },
+    {
+      "priority": "高",
+      "title": "切换到SSH协议 (推荐)",
+      "steps": [
+        "生成SSH密钥: ssh-keygen -t ed25519 -C \"your_email@example.com\"",
+        "将公钥添加到GitHub: https://github.com/settings/keys",
+        "更新远程仓库URL: git remote set-url origin git@github.com:username/repo.git"
+      ]
+    },
+    {
+      "priority": "中",
+      "title": "使用GitHub镜像或CDN",
+      "steps": [
+        "尝试使用GitHub镜像站点",
+        "配置hosts文件指向GitHub的IP地址"
+      ]
+    }
+  ]
+}

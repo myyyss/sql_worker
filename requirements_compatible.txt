@@ -1,0 +1,13 @@
+# 兼容版本的项目依赖包
+# 解决版本冲突问题
+
+# 后端依赖 - 使用更宽松的版本约束
+Flask>=1.1.0,<3.0.0
+Flask-CORS>=3.0.0
+Flask-SQLAlchemy>=2.0.0
+PyJWT>=2.0.0
+Werkzeug>=1.0.0
+
+# 开发工具
+pytest>=6.0.0
+pytest-flask>=1.0.0
